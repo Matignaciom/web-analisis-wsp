@@ -8,10 +8,7 @@
 .dashboardTitle {
   font-size: clamp(1.75rem, 4vw, 2.5rem);
   font-weight: 800;
-  background: linear-gradient(135deg, #1e293b 0%, #3b82f6 50%, #10b981 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #3b82f6;
   margin-bottom: clamp(2rem, 4vw, 3rem);
   text-align: center;
   letter-spacing: -0.025em;
@@ -26,8 +23,7 @@
 }
 
 .metricCard {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(248, 250, 252, 0.9) 100%);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 16px;
   padding: clamp(1.25rem, 3vw, 1.75rem);
   box-shadow: 
@@ -40,7 +36,7 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #e5e7eb;
 }
 
 .metricCard::before {
@@ -87,15 +83,15 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
-  color: #64748b;
+  background: #f3f4f6;
+  color: #6b7280;
   flex-shrink: 0;
   transition: all 0.3s ease;
 }
 
 .metricCard:hover .metricIcon {
   transform: scale(1.1);
-  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  background: #e5e7eb;
 }
 
 .metricContent {
@@ -106,7 +102,7 @@
 .metricTitle {
   font-size: clamp(0.75rem, 1.5vw, 0.875rem);
   font-weight: 700;
-  color: #64748b;
+  color: #6b7280;
   margin: 0 0 0.5rem 0;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -116,7 +112,7 @@
 .metricValue {
   font-size: clamp(1.5rem, 4vw, 2.25rem);
   font-weight: 800;
-  color: #1e293b;
+  color: #000000;
   margin: 0 0 0.25rem 0;
   line-height: 1;
   letter-spacing: -0.025em;
@@ -124,7 +120,7 @@
 
 .metricSubtitle {
   font-size: clamp(0.75rem, 1.5vw, 0.875rem);
-  color: #94a3b8;
+  color: #6b7280;
   margin: 0 0 0.5rem 0;
   font-weight: 500;
 }
@@ -178,69 +174,98 @@
 }
 
 .dynamicCard {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(248, 250, 252, 0.8) 100%);
-  backdrop-filter: blur(10px);
+  background: #ffffff;
   border-radius: 12px;
   padding: clamp(1rem, 2.5vw, 1.25rem);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #e5e7eb;
   transition: all 0.3s ease;
   text-align: center;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
 .dynamicTitle {
   font-size: clamp(0.875rem, 2vw, 1rem);
   font-weight: 600;
-  color: #475569;
+  color: #6b7280;
   margin: 0 0 0.5rem 0;
 }
 
 .dynamicValue {
   font-size: clamp(1.25rem, 3vw, 1.5rem);
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
   margin: 0 0 0.25rem 0;
 }
 
 .dynamicCategory {
   font-size: clamp(0.75rem, 1.5vw, 0.875rem);
-  color: #94a3b8;
+  color: #6b7280;
   font-weight: 500;
-}
-
-.analysisSection {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.6) 0%, rgba(248, 250, 252, 0.6) 100%);
-  backdrop-filter: blur(10px);
-  border-radius: 20px;
-  padding: clamp(1.5rem, 3vw, 2rem);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .sectionTitle {
   font-size: clamp(1.25rem, 3vw, 1.75rem);
   font-weight: 700;
-  color: #1e293b;
+  color: #3b82f6;
   margin-bottom: clamp(1rem, 2.5vw, 1.5rem);
   text-align: center;
-  background: linear-gradient(135deg, #1e293b, #475569);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 .intentionsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
   gap: clamp(0.75rem, 2vw, 1rem);
+  margin-bottom: clamp(2rem, 4vw, 3rem);
 }
 
 .intentionCard {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: clamp(1rem, 2.5vw, 1.25rem);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.3s ease;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.08),
+    0 4px 10px rgba(0, 0, 0, 0.04);
+  border-left: 4px solid;
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(1rem, 2vw, 1.25rem);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  flex-direction: column;
+}
+
+.intentionCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.1) 50%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.intentionCard:hover::before {
+  opacity: 1;
+}
+
+.intentionCard:nth-child(1) {
+  border-left-color: #3b82f6;
+}
+
+.intentionCard:nth-child(2) {
+  border-left-color: #10b981;
+}
+
+.intentionCard:nth-child(3) {
+  border-left-color: #f59e0b;
+}
+
+.intentionCard:nth-child(4) {
+  border-left-color: #ef4444;
 }
 
 .intentionHeader {
@@ -248,24 +273,25 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.75rem;
+  width: 100%;
 }
 
 .intentionLabel {
   font-weight: 600;
-  color: #475569;
+  color: #6b7280;
   font-size: clamp(0.875rem, 2vw, 1rem);
 }
 
 .intentionValue {
   font-weight: 700;
-  color: #1e293b;
+  color: #000000;
   font-size: clamp(1rem, 2.5vw, 1.125rem);
 }
 
 .progressBar {
   width: 100%;
   height: 6px;
-  background-color: #e2e8f0;
+  background-color: #e5e7eb;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -299,7 +325,7 @@
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #e2e8f0;
+  border: 4px solid #e5e7eb;
   border-top: 4px solid #3b82f6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -358,12 +384,15 @@
     grid-template-columns: 1fr;
   }
   
-  .dynamicGrid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  .intentionCard {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+    padding: 1.25rem;
   }
   
-  .analysisSection {
-    padding: 1.5rem;
+  .dynamicGrid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
 }
 
@@ -389,8 +418,8 @@
     padding: 0.875rem;
   }
   
-  .analysisSection {
-    padding: 1rem;
+  .intentionCard {
+    padding: 0.875rem;
   }
   
   .dynamicGrid {
@@ -406,72 +435,8 @@
   .metricCard {
     padding: 0.75rem;
   }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .dashboardTitle {
-    background: linear-gradient(135deg, #f1f5f9 0%, #60a5fa 50%, #34d399 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
   
-  .metricCard {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(51, 65, 85, 0.9) 100%);
-    border-color: rgba(71, 85, 105, 0.3);
-  }
-  
-  .metricIcon {
-    background: linear-gradient(135deg, #1e293b, #334155);
-    color: #94a3b8;
-  }
-  
-  .metricTitle {
-    color: #94a3b8;
-  }
-  
-  .metricValue {
-    color: #f1f5f9;
-  }
-  
-  .metricSubtitle {
-    color: #64748b;
-  }
-  
-  .analysisSection {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(51, 65, 85, 0.8) 100%);
-    border-color: rgba(71, 85, 105, 0.3);
-  }
-  
-  .sectionTitle {
-    background: linear-gradient(135deg, #f1f5f9, #cbd5e1);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  
-  .intentionCard,
-  .dynamicCard {
-    background: rgba(30, 41, 59, 0.8);
-    border-color: rgba(71, 85, 105, 0.3);
-  }
-  
-  .intentionLabel,
-  .dynamicTitle {
-    color: #94a3b8;
-  }
-  
-  .intentionValue,
-  .dynamicValue {
-    color: #f1f5f9;
-  }
-  
-  .dynamicCategory {
-    color: #64748b;
-  }
-  
-  .progressBar {
-    background-color: #374151;
+  .intentionCard {
+    padding: 0.75rem;
   }
 } 

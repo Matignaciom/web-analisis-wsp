@@ -146,14 +146,12 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
             >
-              <Upload className={styles.uploadIcon} size={48} />
-              <h3 className={styles.uploadTitle}>Cargar archivo de datos</h3>
-              <p className={styles.uploadDescription}>
-                Arrastra y suelta tu archivo aquí o haz clic para seleccionar
-              </p>
-              <p className={styles.uploadFormats}>
-                Formatos: {acceptedFormats.join(', ')} • Máx. {maxSizeInMB}MB
-              </p>
+              <div className={styles.uploadIcon}>
+                <Upload size={32} />
+              </div>
+              <h3 className={styles.uploadTitle}>CARGAR ARCHIVO</h3>
+              <p className={styles.uploadDescription}>Selecciona tu archivo de datos</p>
+              <p className={styles.uploadFormats}>Formatos soportados: .xlsx, .csv</p>
             </motion.div>
           ) : (
             <motion.div

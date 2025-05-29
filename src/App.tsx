@@ -63,8 +63,7 @@ const UploadPage = () => {
   }, [selectedFile])
 
   return (
-    <motion.section 
-      className="upload-section"
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -86,7 +85,7 @@ const UploadPage = () => {
         progress={progress}
         error={error}
       />
-    </motion.section>
+    </motion.div>
   )
 }
 
@@ -102,14 +101,13 @@ const DashboardPage = () => {
   }
 
   return (
-    <motion.section 
-      className="dashboard-section"
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
       <Dashboard metrics={mockMetrics} />
-    </motion.section>
+    </motion.div>
   )
 }
 
@@ -119,10 +117,11 @@ const ConversationsPage = () => (
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
-    className="upload-section"
   >
-    <h2>Conversaciones</h2>
-    <p>Aquí se mostrarán todas las conversaciones analizadas.</p>
+    <div className="upload-header">
+      <h2>Conversaciones</h2>
+      <p>Aquí se mostrarán todas las conversaciones analizadas con detalles completos y métricas de rendimiento.</p>
+    </div>
   </motion.div>
 )
 
@@ -132,10 +131,11 @@ const ExportPage = () => (
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.5 }}
-    className="upload-section"
   >
-    <h2>Exportar Datos</h2>
-    <p>Aquí podrás exportar los resultados del análisis.</p>
+    <div className="upload-header">
+      <h2>Exportar Datos</h2>
+      <p>Aquí podrás exportar los resultados del análisis en diferentes formatos para su uso posterior.</p>
+    </div>
   </motion.div>
 )
 
