@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Toaster, toast } from 'react-hot-toast'
 import Layout from '@/presentation/components/Layout'
@@ -6,7 +7,8 @@ import Dashboard from '@/presentation/components/Dashboard'
 import FileUploader from '@/presentation/components/FileUploader'
 import './App.css'
 
-function App() {
+// Componente para la página de carga de archivos
+const UploadPage = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -70,61 +72,99 @@ function App() {
     }
   }, [selectedFile])
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
+  return (
+    <motion.section 
+      className="upload-section"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="upload-header">
+        <h2>Cargar Datos para Análisis</h2>
+        <p>
+          Sube tu archivo Excel o CSV con los datos de conversaciones de WhatsApp 
+          para obtener un análisis detallado con inteligencia artificial.
+        </p>
+      </div>
+      
+      <FileUploader 
+        onFileSelect={handleFileSelect}
+        onFileProcess={handleFileProcess}
+        acceptedFormats={['.xlsx', '.csv']}
+        maxSizeInMB={25}
+        isProcessing={isProcessing}
+        progress={progress}
+        error={error}
+      />
+    </motion.section>
+  )
+}
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+// Componente para la página del dashboard
+const DashboardPage = () => {
+  const mockMetrics = {
+    totalConversations: 1247,
+    completedSales: 342,
+    abandonedChats: 156,
+    averageResponseTime: '2.5 min',
+    conversionRate: 27.4,
+    satisfactionScore: 4.2
   }
 
   return (
-    <>
-      <Layout title="Análisis Comercial WhatsApp">
-        <motion.div 
-          className="app-content"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.section 
-            className="upload-section"
-            variants={itemVariants}
-          >
-            <div className="upload-header">
-              <h2>Cargar Datos para Análisis</h2>
-              <p>
-                Sube tu archivo Excel o CSV con los datos de conversaciones de WhatsApp 
-                para obtener un análisis detallado con inteligencia artificial.
-              </p>
-            </div>
-            
-            <FileUploader 
-              onFileSelect={handleFileSelect}
-              onFileProcess={handleFileProcess}
-              acceptedFormats={['.xlsx', '.csv']}
-              maxSizeInMB={25}
-              isProcessing={isProcessing}
-              progress={progress}
-              error={error}
-            />
-          </motion.section>
+    <motion.section 
+      className="dashboard-section"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <Dashboard metrics={mockMetrics} />
+    </motion.section>
+  )
+}
 
-          <motion.section 
-            className="dashboard-section"
-            variants={itemVariants}
-          >
-            <Dashboard metrics={mockMetrics} />
-          </motion.section>
-        </motion.div>
-      </Layout>
+// Placeholder para conversaciones
+const ConversationsPage = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="upload-section"
+  >
+    <h2>Conversaciones</h2>
+    <p>Aquí se mostrarán todas las conversaciones analizadas.</p>
+  </motion.div>
+)
+
+// Placeholder para exportar
+const ExportPage = () => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5 }}
+    className="upload-section"
+  >
+    <h2>Exportar Datos</h2>
+    <p>Aquí podrás exportar los resultados del análisis.</p>
+  </motion.div>
+)
+
+function App() {
+  return (
+    <>
+      <Router>
+        <Layout title="Análisis Comercial WhatsApp">
+          <div className="app-content">
+            <Routes>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/upload" element={<UploadPage />} />
+              <Route path="/conversations" element={<ConversationsPage />} />
+              <Route path="/export" element={<ExportPage />} />
+            </Routes>
+          </div>
+        </Layout>
+      </Router>
       
       <Toaster
         position="top-right"

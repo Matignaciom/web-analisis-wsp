@@ -80,6 +80,16 @@
   opacity: 1;
 }
 
+.navLinkActive {
+  color: #f1f5f9 !important;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(147, 51, 234, 0.3));
+  transform: translateY(-1px);
+}
+
+.navLinkActive::before {
+  opacity: 1;
+}
+
 .main {
   flex: 1;
   width: 100%;

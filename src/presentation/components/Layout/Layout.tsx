@@ -1,4 +1,5 @@
 import React from 'react'
+import { NavLink } from 'react-router-dom'
 import styles from './Layout.module.css'
 
 interface LayoutProps {
@@ -13,10 +14,38 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'Análisis WhatsApp' 
         <div className={styles.headerContent}>
           <h1 className={styles.title}>{title}</h1>
           <nav className={styles.nav}>
-            <a href="#dashboard" className={styles.navLink}>Dashboard</a>
-            <a href="#upload" className={styles.navLink}>Cargar Datos</a>
-            <a href="#conversations" className={styles.navLink}>Conversaciones</a>
-            <a href="#export" className={styles.navLink}>Exportar</a>
+            <NavLink 
+              to="/dashboard" 
+              className={({ isActive }) => 
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+              }
+            >
+              Dashboard
+            </NavLink>
+            <NavLink 
+              to="/upload" 
+              className={({ isActive }) => 
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+              }
+            >
+              Cargar Datos
+            </NavLink>
+            <NavLink 
+              to="/conversations" 
+              className={({ isActive }) => 
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+              }
+            >
+              Conversaciones
+            </NavLink>
+            <NavLink 
+              to="/export" 
+              className={({ isActive }) => 
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
+              }
+            >
+              Exportar
+            </NavLink>
           </nav>
         </div>
       </header>
