@@ -1,0 +1,38 @@
+[build]
+  # Comando de build
+  command = "npm run build"
+  
+  # Directorio donde se genera el build
+  publish = "dist"
+  
+  # Configuración de Node.js
+  environment = { NODE_VERSION = "18" }
+
+[build.environment]
+  # Variables de entorno para el build
+  NODE_ENV = "production"
+  CI = "true"
+
+# Redirecciones para React Router (SPA)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers de seguridad y optimización
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Configuración de funciones (si las usas más adelante)
+[functions]
+  directory = "netlify/functions" 

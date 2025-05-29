@@ -14,16 +14,6 @@ const UploadPage = () => {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
   
-  // Datos de ejemplo mejorados para el dashboard
-  const mockMetrics = {
-    totalConversations: 1247,
-    completedSales: 342,
-    abandonedChats: 156,
-    averageResponseTime: '2.5 min',
-    conversionRate: 27.4,
-    satisfactionScore: 4.2
-  }
-
   const handleFileSelect = useCallback((file: File) => {
     setSelectedFile(file)
     setError(null)
