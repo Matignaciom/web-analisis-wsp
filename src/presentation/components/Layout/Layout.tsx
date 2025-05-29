@@ -1,5 +1,5 @@
 import React from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { MessageCircle } from 'lucide-react'
 import styles from './Layout.module.css'
 
@@ -9,6 +9,11 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
+  const location = useLocation()
+  
+  // Determinar si el Dashboard debe estar activo (en "/" o "/dashboard")
+  const isDashboardActive = location.pathname === '/' || location.pathname === '/dashboard'
+  
   return (
     <div className={styles.layout}>
       <header className={styles.header}>
@@ -20,9 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
           <nav className={styles.nav}>
             <NavLink 
               to="/dashboard" 
-              className={({ isActive }) => 
-                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
-              }
+              className={`${styles.navLink} ${isDashboardActive ? styles.navLinkActive : ''}`}
             >
               Dashboard
             </NavLink>
