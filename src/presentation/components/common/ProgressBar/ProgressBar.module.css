@@ -1,0 +1,97 @@
+.container {
+  width: 100%;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.percentage {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.track {
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  transition: width 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  pointer-events: none;
+}
+
+/* Sizes */
+.small {
+  height: 4px;
+}
+
+.medium {
+  height: 6px;
+}
+
+.large {
+  height: 8px;
+}
+
+/* Variants */
+.primary {
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+}
+
+.success {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.warning {
+  background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+.error {
+  background: linear-gradient(90deg, #ef4444, #dc2626);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .track {
+    background-color: #374151;
+  }
+  
+  .label {
+    color: #d1d5db;
+  }
+  
+  .percentage {
+    color: #9ca3af;
+  }
+} 
