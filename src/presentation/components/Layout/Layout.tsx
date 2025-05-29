@@ -14,7 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.brandContainer}>
-            <h1 className={styles.title}>FB</h1>
+            <h1 className={styles.title}>{title}</h1>
             <MessageCircle className={styles.logo} size={32} />
           </div>
           <nav className={styles.nav}>
