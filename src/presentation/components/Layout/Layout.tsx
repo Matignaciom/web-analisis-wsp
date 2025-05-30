@@ -1,6 +1,5 @@
 import React from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { MessageCircle } from 'lucide-react'
 import styles from './Layout.module.css'
 
 interface LayoutProps {
@@ -8,7 +7,7 @@ interface LayoutProps {
   title?: string
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
+const Layout: React.FC<LayoutProps> = ({ children, title = 'FB - IA' }) => {
   const location = useLocation()
   
   // Determinar si el Dashboard debe estar activo (en "/" o "/dashboard")
@@ -20,7 +19,11 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
         <div className={styles.headerContent}>
           <div className={styles.brandContainer}>
             <h1 className={styles.title}>{title}</h1>
-            <MessageCircle className={styles.logo} size={32} />
+            <img 
+              src="/images/Logo_FB_AI.png" 
+              alt="FB - IA Logo" 
+              className={styles.logo}
+            />
           </div>
           <nav className={styles.nav}>
             <NavLink 
@@ -64,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'FB' }) => {
       </main>
       
       <footer className={styles.footer}>
-        <p>&copy; {new Date().getFullYear()} Análisis Comercial WhatsApp</p>
+        <p>&copy; {new Date().getFullYear()} Análisis comercial FB</p>
       </footer>
     </div>
   )

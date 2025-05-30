@@ -143,7 +143,7 @@ function App() {
   return (
     <>
       <Router>
-        <Layout title="Análisis Comercial WhatsApp">
+        <Layout title="FB - IA">
           <div className="app-content">
             <Routes>
               <Route path="/" element={<DashboardPage />} />
