@@ -3,12 +3,9 @@ import { motion } from 'framer-motion'
 import { 
   FileText, 
   FileSpreadsheet, 
-  Download, 
   Settings, 
   BarChart3, 
   MessageSquare, 
-  Brain,
-  Calendar,
   CheckCircle2,
   Circle
 } from 'lucide-react'
