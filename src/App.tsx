@@ -7,11 +7,9 @@ import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useDashboardMetrics, useConversations } from '@/presentation/store/useAppStore'
 import ExportPage from '@/presentation/components/ExportPage'
 import './App.css'
-import { useState } from 'react'
 
 const UploadPage = () => {
   const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileSelect = (file: File) => {
     console.log('📁 Archivo seleccionado:', {
@@ -20,7 +18,6 @@ const UploadPage = () => {
       type: file?.type || 'Sin tipo',
       isValid: file instanceof File
     })
-    setSelectedFile(file)
     resetState()
   }
 
