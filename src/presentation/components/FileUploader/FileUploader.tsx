@@ -7,7 +7,7 @@ import styles from './FileUploader.module.css'
 
 interface FileUploaderProps {
   onFileSelect?: (file: File) => void
-  onFileProcess?: () => void
+  onFileProcess?: (file: File) => void
   acceptedFormats?: string[]
   maxSizeInMB?: number
   isProcessing?: boolean
@@ -230,7 +230,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             Archivo cargado correctamente. 
             {onFileProcess && (
               <motion.button
-                onClick={onFileProcess}
+                onClick={() => onFileProcess(selectedFile)}
                 className={styles.processButton}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}

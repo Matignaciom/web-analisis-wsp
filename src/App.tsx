@@ -1,188 +1,250 @@
-import { useState, useCallback } from 'react'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Toaster, toast } from 'react-hot-toast'
-import Layout from '@/presentation/components/Layout'
-import Dashboard from '@/presentation/components/Dashboard'
-import FileUploader from '@/presentation/components/FileUploader'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
+import { Layout } from '@/presentation/components/Layout'
+import { Dashboard } from '@/presentation/components/Dashboard'
+import { FileUploader } from '@/presentation/components/FileUploader'
+import { useFileProcessor } from '@/hooks/useFileProcessor'
+import { useDashboardMetrics, useConversations } from '@/presentation/store/useAppStore'
+import ExportPage from '@/presentation/components/ExportPage'
 import './App.css'
 
-// Componente para la página de carga de archivos
 const UploadPage = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  
-  const handleFileSelect = useCallback((file: File) => {
-    setSelectedFile(file)
-    setError(null)
-    toast.success(`Archivo "${file.name}" cargado correctamente`)
-    console.log('Archivo seleccionado:', file.name)
-  }, [])
+  const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
 
-  const handleFileProcess = useCallback(async () => {
-    if (!selectedFile) {
-      toast.error('No hay archivo seleccionado')
+  const handleFileSelect = (file: File) => {
+    console.log('📁 Archivo seleccionado:', {
+      name: file?.name || 'Sin nombre',
+      size: file?.size || 0,
+      type: file?.type || 'Sin tipo',
+      isValid: file instanceof File
+    })
+    resetState()
+  }
+
+  const handleFileProcess = async (file: File) => {
+    console.log('🔄 Iniciando procesamiento desde App.tsx:', {
+      file: file,
+      isFile: file instanceof File,
+      name: file?.name,
+      hasFile: !!file
+    })
+    
+    if (!file || !(file instanceof File)) {
+      console.error('❌ Archivo inválido recibido en handleFileProcess')
       return
     }
-
-    setIsProcessing(true)
-    setProgress(0)
-    setError(null)
-
-    try {
-      // Simular procesamiento con progreso
-      const steps = [
-        { message: 'Validando archivo...', progress: 20 },
-        { message: 'Extrayendo datos...', progress: 40 },
-        { message: 'Analizando conversaciones...', progress: 60 },
-        { message: 'Procesando con IA...', progress: 80 },
-        { message: 'Generando métricas...', progress: 100 }
-      ]
-
-      for (const step of steps) {
-        await new Promise(resolve => setTimeout(resolve, 800))
-        setProgress(step.progress)
-        toast.loading(step.message, { id: 'processing' })
-      }
-
-      toast.success('¡Archivo procesado exitosamente!', { id: 'processing' })
-      
-      // Aquí podrías actualizar el estado global con los resultados
-      // useAppStore.getState().setDashboardMetrics(newMetrics)
-      
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error procesando archivo'
-      setError(errorMessage)
-      toast.error(errorMessage, { id: 'processing' })
-    } finally {
-      setIsProcessing(false)
-      setProgress(0)
-    }
-  }, [selectedFile])
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="upload-header">
-        <h2>Cargar Datos para Análisis</h2>
-        <p>
-          Sube tu archivo Excel o CSV con los datos de conversaciones de WhatsApp 
-          para obtener un análisis detallado con inteligencia artificial.
-        </p>
-      </div>
-      
-      <FileUploader 
-        onFileSelect={handleFileSelect}
-        onFileProcess={handleFileProcess}
-        acceptedFormats={['.xlsx', '.csv']}
-        maxSizeInMB={25}
-        isProcessing={isProcessing}
-        progress={progress}
-        error={error}
-      />
-    </motion.div>
-  )
-}
-
-// Componente para la página del dashboard
-const DashboardPage = () => {
-  const mockMetrics = {
-    totalConversations: 1247,
-    completedSales: 342,
-    abandonedChats: 156,
-    averageResponseTime: '2.5 min',
-    conversionRate: 27.4,
-    satisfactionScore: 4.2
+    
+    await processFile(file)
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Dashboard metrics={mockMetrics} />
-    </motion.div>
+    <div className="app-content">
+      <div className="upload-header">
+        <h2>📊 Análisis de Conversaciones WhatsApp</h2>
+        <p>
+          Sube tu archivo Excel con las conversaciones para obtener análisis detallados
+          de sentimientos, intenciones y métricas de rendimiento usando IA.
+        </p>
+      </div>
+
+      <FileUploader
+        onFileSelect={handleFileSelect}
+        onFileProcess={handleFileProcess}
+        isProcessing={isProcessing}
+        progress={progress}
+        error={error}
+        acceptedFormats={['.xlsx', '.xls', '.csv']}
+        maxSizeInMB={25}
+      />
+
+      {error && (
+        <div className="file-status error">
+          <h3>❌ Error en el procesamiento</h3>
+          <p>{error}</p>
+          <button onClick={resetState} className="process-button">
+            Reintentar
+          </button>
+        </div>
+      )}
+
+      <div className="upload-tips">
+        <h3>💡 Formato esperado del archivo:</h3>
+        <ul>
+          <li><strong>Cliente/Nombre:</strong> Nombre del cliente</li>
+          <li><strong>Teléfono/WhatsApp:</strong> Número de teléfono</li>
+          <li><strong>Fecha:</strong> Fecha de inicio de conversación</li>
+          <li><strong>Estado:</strong> activo, completado, abandonado, pendiente</li>
+          <li><strong>Mensajes:</strong> Cantidad total de mensajes</li>
+          <li><strong>Último mensaje:</strong> Contenido del último mensaje</li>
+          <li><strong>Agente:</strong> Agente asignado (opcional)</li>
+        </ul>
+        <p>
+          <strong>Nota:</strong> El sistema detecta automáticamente las columnas usando
+          nombres en español e inglés. Los campos mínimos requeridos son Cliente y Teléfono.
+        </p>
+      </div>
+    </div>
   )
 }
 
-// Placeholder para conversaciones
-const ConversationsPage = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-  >
-    <div className="upload-header">
-      <h2>Conversaciones</h2>
-      <p>Aquí se mostrarán todas las conversaciones analizadas con detalles completos y métricas de rendimiento.</p>
-    </div>
-  </motion.div>
-)
+const DashboardPage = () => {
+  const metrics = useDashboardMetrics()
+  const conversations = useConversations()
 
-// Placeholder para exportar
-const ExportPage = () => (
-  <motion.div
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.5 }}
-  >
-    <div className="upload-header">
-      <h2>Exportar Datos</h2>
-      <p>Aquí podrás exportar los resultados del análisis en diferentes formatos para su uso posterior.</p>
+  const transformedMetrics = metrics ? {
+    totalConversations: metrics.totalConversations,
+    completedSales: metrics.completedSales,
+    abandonedChats: metrics.abandonedChats,
+    averageResponseTime: metrics.averageResponseTime,
+    conversionRate: metrics.conversionRate || 0,
+    satisfactionScore: metrics.satisfactionScore || 0
+  } : undefined
+
+  const dynamicData = conversations.length > 0 ? [
+    {
+      title: 'Conversaciones Hoy',
+      value: conversations.filter(c => {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        return c.startDate >= today
+      }).length,
+      type: 'number' as const,
+      category: 'Actividad'
+    },
+    {
+      title: 'Promedio Mensajes',
+      value: Math.round(conversations.reduce((acc, c) => acc + c.totalMessages, 0) / conversations.length) || 0,
+      type: 'number' as const,
+      category: 'Engagement'
+    },
+    {
+      title: 'Agentes Activos',
+      value: new Set(conversations.filter(c => c.assignedAgent).map(c => c.assignedAgent)).size,
+      type: 'number' as const,
+      category: 'Equipo'
+    },
+    {
+      title: 'Tasa Respuesta',
+      value: `${Math.round((conversations.filter(c => c.status === 'completed').length / conversations.length) * 100) || 0}%`,
+      type: 'percentage' as const,
+      category: 'Eficiencia'
+    }
+  ] : undefined
+
+  return (
+    <div className="app-content">
+      <Dashboard 
+        metrics={transformedMetrics}
+        isLoading={!metrics && conversations.length === 0}
+        dynamicData={dynamicData}
+      />
+      
+      {conversations.length === 0 && (
+        <div className="upload-header">
+          <h3>📤 No hay datos disponibles</h3>
+          <p>
+            Sube un archivo Excel con conversaciones para ver el análisis completo 
+            con métricas de IA, sentimientos e intenciones.
+          </p>
+        </div>
+      )}
     </div>
-  </motion.div>
-)
+  )
+}
+
+const ConversationsPage = () => {
+  const conversations = useConversations()
+
+  return (
+    <div className="app-content">
+      <h2>💬 Conversaciones Analizadas</h2>
+      {conversations.length > 0 ? (
+        <div className="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Teléfono</th>
+                <th>Estado</th>
+                <th>Mensajes</th>
+                <th>Fecha</th>
+                <th>Agente</th>
+                <th>Último Mensaje</th>
+              </tr>
+            </thead>
+            <tbody>
+              {conversations.map(conv => (
+                <tr key={conv.id}>
+                  <td>{conv.customerName}</td>
+                  <td>{conv.customerPhone}</td>
+                  <td>
+                    <span className={`status status-${conv.status}`}>
+                      {conv.status === 'active' ? '🟢 Activo' :
+                       conv.status === 'completed' ? '✅ Completado' :
+                       conv.status === 'abandoned' ? '🔴 Abandonado' :
+                       '⏳ Pendiente'}
+                    </span>
+                  </td>
+                  <td>{conv.totalMessages}</td>
+                  <td>{conv.startDate.toLocaleDateString()}</td>
+                  <td>{conv.assignedAgent || 'Sin asignar'}</td>
+                  <td className="last-message">{conv.lastMessage}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="upload-header">
+          <p>No hay conversaciones disponibles. Sube un archivo para comenzar el análisis.</p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function App() {
   return (
-    <>
-      <Router>
-        <Layout title="FB - IA">
-          <div className="app-content">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/upload" element={<UploadPage />} />
-              <Route path="/conversations" element={<ConversationsPage />} />
-              <Route path="/export" element={<ExportPage />} />
-            </Routes>
-          </div>
-        </Layout>
-      </Router>
-      
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-            borderRadius: '12px',
-            padding: '16px',
-            fontSize: '14px',
-            fontWeight: '500'
-          },
-          success: {
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff'
-            }
-          },
-          error: {
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff'
-            }
-          }
-        }}
-      />
-    </>
+    <Router 
+      future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true
+      }}
+    >
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Navigate to="/upload" replace />} />
+          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/conversations" element={<ConversationsPage />} />
+          <Route path="/export" element={<ExportPage />} />
+        </Routes>
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              duration: 5000,
+              iconTheme: {
+                primary: '#4ade80',
+                secondary: '#fff',
+              },
+            },
+            error: {
+              duration: 6000,
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#fff',
+              },
+            },
+          }}
+        />
+      </Layout>
+    </Router>
   )
 }
 
