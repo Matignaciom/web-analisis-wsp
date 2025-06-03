@@ -1,139 +1,112 @@
-import { useState, useCallback, useRef } from 'react'
-import { ProcessFileUseCase } from '@/application/usecases/ProcessFileUseCase'
-import type { ProcessFileResult } from '@/application/usecases/ProcessFileUseCase'
+import { useState, useCallback } from 'react'
+import { SupabaseStorageService, type UploadResult } from '../../infrastructure/services/SupabaseStorageService'
 
-interface UseFileUploadOptions {
-  onSuccess?: (result: ProcessFileResult) => void
-  onError?: (error: string) => void
-  maxSizeInMB?: number
-  acceptedFormats?: string[]
+export interface UploadState {
+  isUploading: boolean
+  uploadProgress: number
+  uploadedFile: {
+    path: string
+    fileId: string
+    name: string
+  } | null
+  error: string | null
 }
 
-export const useFileUpload = (
-  processFileUseCase: ProcessFileUseCase,
-  options: UseFileUploadOptions = {}
-) => {
-  const {
-    onSuccess,
-    onError,
-    maxSizeInMB = 25,
-    acceptedFormats = ['.xlsx', '.csv']
-  } = options
+export interface UseFileUploadReturn {
+  uploadState: UploadState
+  uploadFile: (file: File) => Promise<UploadResult>
+  resetUpload: () => void
+  clearError: () => void
+}
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [progress, setProgress] = useState(0)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<ProcessFileResult | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+export const useFileUpload = (): UseFileUploadReturn => {
+  const [uploadState, setUploadState] = useState<UploadState>({
+    isUploading: false,
+    uploadProgress: 0,
+    uploadedFile: null,
+    error: null
+  })
 
-  const validateFile = useCallback((file: File): { isValid: boolean; error?: string } => {
-    // Validar tamaño
-    const maxSizeInBytes = maxSizeInMB * 1024 * 1024
-    if (file.size > maxSizeInBytes) {
-      return {
-        isValid: false,
-        error: `El archivo es muy grande. Máximo ${maxSizeInMB}MB permitido.`
-      }
-    }
+  const storageService = new SupabaseStorageService()
 
-    // Validar formato
-    const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase()
-    if (!acceptedFormats.includes(fileExtension)) {
-      return {
-        isValid: false,
-        error: `Formato no válido. Solo se permiten: ${acceptedFormats.join(', ')}`
-      }
-    }
-
-    return { isValid: true }
-  }, [maxSizeInMB, acceptedFormats])
-
-  const selectFile = useCallback((file: File) => {
-    const validation = validateFile(file)
-    if (!validation.isValid) {
-      setError(validation.error || 'Archivo inválido')
-      return false
-    }
-
-    setSelectedFile(file)
-    setError(null)
-    setResult(null)
-    return true
-  }, [validateFile])
-
-  const processFile = useCallback(async () => {
-    if (!selectedFile) {
-      setError('No hay archivo seleccionado')
-      return
-    }
-
-    setIsProcessing(true)
-    setProgress(0)
-    setError(null)
-    abortControllerRef.current = new AbortController()
+  const uploadFile = useCallback(async (file: File): Promise<UploadResult> => {
+    setUploadState(prev => ({
+      ...prev,
+      isUploading: true,
+      uploadProgress: 0,
+      error: null
+    }))
 
     try {
-      // Simular progreso
+      // Simular progreso de subida (Supabase no proporciona progreso real)
       const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 10, 90))
-      }, 200)
+        setUploadState(prev => ({
+          ...prev,
+          uploadProgress: Math.min(prev.uploadProgress + 10, 90)
+        }))
+      }, 100)
 
-      const result = await processFileUseCase.execute(selectedFile)
-      
+      const result = await storageService.uploadFile(file)
       clearInterval(progressInterval)
-      setProgress(100)
-      setResult(result)
 
       if (result.success) {
-        onSuccess?.(result)
+        setUploadState(prev => ({
+          ...prev,
+          isUploading: false,
+          uploadProgress: 100,
+          uploadedFile: {
+            path: result.path,
+            fileId: result.fileId,
+            name: file.name
+          },
+          error: null
+        }))
       } else {
-        setError(result.error || 'Error procesando archivo')
-        onError?.(result.error || 'Error procesando archivo')
+        setUploadState(prev => ({
+          ...prev,
+          isUploading: false,
+          uploadProgress: 0,
+          error: result.error
+        }))
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Error desconocido'
-      setError(errorMessage)
-      onError?.(errorMessage)
-    } finally {
-      setIsProcessing(false)
-      abortControllerRef.current = null
-    }
-  }, [selectedFile, processFileUseCase, onSuccess, onError])
 
-  const cancelProcessing = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-      setIsProcessing(false)
-      setProgress(0)
+      return result
+
+    } catch (error) {
+      setUploadState(prev => ({
+        ...prev,
+        isUploading: false,
+        uploadProgress: 0,
+        error: 'Error inesperado durante la subida'
+      }))
+
+      return {
+        success: false,
+        error: 'Error inesperado durante la subida'
+      }
     }
   }, [])
 
-  const reset = useCallback(() => {
-    setSelectedFile(null)
-    setError(null)
-    setResult(null)
-    setProgress(0)
-    setIsProcessing(false)
+  const resetUpload = useCallback(() => {
+    setUploadState({
+      isUploading: false,
+      uploadProgress: 0,
+      uploadedFile: null,
+      error: null
+    })
   }, [])
 
-  const removeFile = useCallback(() => {
-    setSelectedFile(null)
-    setError(null)
-    setResult(null)
+  const clearError = useCallback(() => {
+    setUploadState(prev => ({
+      ...prev,
+      error: null
+    }))
   }, [])
 
   return {
-    selectedFile,
-    isProcessing,
-    progress,
-    error,
-    result,
-    selectFile,
-    processFile,
-    cancelProcessing,
-    reset,
-    removeFile,
-    validateFile
+    uploadState,
+    uploadFile,
+    resetUpload,
+    clearError
   }
 } 

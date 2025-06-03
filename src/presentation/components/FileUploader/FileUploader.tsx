@@ -1,35 +1,43 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Upload, File, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, File, X, CheckCircle, AlertCircle, Cloud } from 'lucide-react'
 import LoadingSpinner from '../common/LoadingSpinner'
 import ProgressBar from '../common/ProgressBar'
+import { useFileUpload } from '../../hooks/useFileUpload'
 import styles from './FileUploader.module.css'
 
 interface FileUploaderProps {
   onFileSelect?: (file: File) => void
-  onFileProcess?: (file: File) => void
+  onFileProcess?: (file: File, uploadedPath?: string) => void
+  onUploadComplete?: (filePath: string, fileName: string) => void
   acceptedFormats?: string[]
   maxSizeInMB?: number
   isProcessing?: boolean
   progress?: number
   error?: string | null
   className?: string
+  autoUpload?: boolean // Nueva prop para controlar subida automática
 }
 
 const FileUploader: React.FC<FileUploaderProps> = ({
   onFileSelect,
   onFileProcess,
+  onUploadComplete,
   acceptedFormats = ['.xlsx', '.csv'],
   maxSizeInMB = 25,
   isProcessing = false,
   progress = 0,
   error,
-  className = ''
+  className = '',
+  autoUpload = true
 }) => {
   const [isDragOver, setIsDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Hook para manejar subidas de Supabase
+  const { uploadState, uploadFile, resetUpload, clearError } = useFileUpload()
 
   const validateFile = useCallback((file: File): { isValid: boolean; error?: string } => {
     // Validar tamaño
@@ -53,7 +61,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     return { isValid: true }
   }, [maxSizeInMB, acceptedFormats])
 
-  const handleFileSelect = useCallback((file: File) => {
+  const handleFileSelect = useCallback(async (file: File) => {
     const validation = validateFile(file)
     if (!validation.isValid) {
       setValidationError(validation.error || 'Archivo inválido')
@@ -62,8 +70,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
     setSelectedFile(file)
     setValidationError(null)
+    clearError()
     onFileSelect?.(file)
-  }, [validateFile, onFileSelect])
+
+    // Si autoUpload está habilitado, subir automáticamente a Supabase
+    if (autoUpload) {
+      try {
+        const uploadResult = await uploadFile(file)
+        if (uploadResult.success && uploadResult.path) {
+          onUploadComplete?.(uploadResult.path, file.name)
+        }
+      } catch (error) {
+        console.error('Error en la subida automática:', error)
+      }
+    }
+  }, [validateFile, onFileSelect, autoUpload, uploadFile, clearError, onUploadComplete])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -93,19 +114,26 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   }, [handleFileSelect])
 
   const handleClick = useCallback(() => {
-    if (!isProcessing) {
+    if (!isProcessing && !uploadState.isUploading) {
       fileInputRef.current?.click()
     }
-  }, [isProcessing])
+  }, [isProcessing, uploadState.isUploading])
 
   const handleRemoveFile = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setSelectedFile(null)
     setValidationError(null)
+    resetUpload()
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
-  }, [])
+  }, [resetUpload])
+
+  const handleProcessFile = useCallback(() => {
+    if (selectedFile) {
+      onFileProcess?.(selectedFile, uploadState.uploadedFile?.path)
+    }
+  }, [selectedFile, onFileProcess, uploadState.uploadedFile])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes'
@@ -115,18 +143,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const currentError = error || validationError
+  const currentError = error || validationError || uploadState.error
+  const isUploading = uploadState.isUploading
+  const isUploaded = uploadState.uploadedFile !== null
+  const currentProgress = isUploading ? uploadState.uploadProgress : progress
 
   return (
     <div className={`${styles.fileUploader} ${className}`}>
       <motion.div
-        className={`${styles.dropZone} ${isDragOver ? styles.dragOver : ''} ${currentError ? styles.error : ''} ${isProcessing ? styles.processing : ''}`}
+        className={`${styles.dropZone} ${isDragOver ? styles.dragOver : ''} ${currentError ? styles.error : ''} ${(isProcessing || isUploading) ? styles.processing : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={handleClick}
-        whileHover={!isProcessing ? { scale: 1.01 } : {}}
-        whileTap={!isProcessing ? { scale: 0.99 } : {}}
+        whileHover={!isProcessing && !isUploading ? { scale: 1.01 } : {}}
+        whileTap={!isProcessing && !isUploading ? { scale: 0.99 } : {}}
       >
         <input
           ref={fileInputRef}
@@ -134,7 +165,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           accept={acceptedFormats.join(',')}
           onChange={handleInputChange}
           className={styles.hiddenInput}
-          disabled={isProcessing}
+          disabled={isProcessing || isUploading}
         />
         
         <AnimatePresence mode="wait">
@@ -150,7 +181,9 @@ const FileUploader: React.FC<FileUploaderProps> = ({
                 <Upload size={32} />
               </div>
               <h3 className={styles.uploadTitle}>CARGAR ARCHIVO</h3>
-              <p className={styles.uploadDescription}>Selecciona tu archivo de datos</p>
+              <p className={styles.uploadDescription}>
+                {autoUpload ? 'Selecciona tu archivo - se subirá automáticamente' : 'Selecciona tu archivo de datos'}
+              </p>
               <p className={styles.uploadFormats}>Formatos soportados: .xlsx, .csv</p>
             </motion.div>
           ) : (
@@ -161,14 +194,21 @@ const FileUploader: React.FC<FileUploaderProps> = ({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
             >
-              <File className={styles.fileIcon} size={32} />
+              <div className={styles.fileIcon}>
+                {isUploaded ? (
+                  <Cloud size={32} color="#10b981" />
+                ) : (
+                  <File size={32} />
+                )}
+              </div>
               <div className={styles.fileInfo}>
                 <h4 className={styles.fileName}>{selectedFile.name}</h4>
                 <p className={styles.fileSize}>
                   {formatFileSize(selectedFile.size)}
+                  {isUploaded && <span style={{ color: '#10b981', marginLeft: '8px' }}>✓ Subido</span>}
                 </p>
               </div>
-              {!isProcessing && (
+              {!isProcessing && !isUploading && (
                 <motion.button
                   onClick={handleRemoveFile}
                   className={styles.removeButton}
@@ -185,7 +225,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
 
       {/* Progress Bar */}
       <AnimatePresence>
-        {isProcessing && (
+        {(isProcessing || isUploading) && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -193,8 +233,8 @@ const FileUploader: React.FC<FileUploaderProps> = ({
             className={styles.progressContainer}
           >
             <ProgressBar
-              progress={progress}
-              label="Procesando archivo..."
+              progress={currentProgress}
+              label={isUploading ? "Subiendo archivo..." : "Procesando archivo..."}
               variant="primary"
               animated
             />
@@ -206,52 +246,62 @@ const FileUploader: React.FC<FileUploaderProps> = ({
       <AnimatePresence>
         {currentError && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
             className={styles.errorMessage}
           >
-            <AlertCircle className={styles.errorIcon} size={16} />
-            {currentError}
+            <AlertCircle size={16} className={styles.errorIcon} />
+            <span>{currentError}</span>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Success Message */}
       <AnimatePresence>
-        {selectedFile && !currentError && !isProcessing && (
+        {isUploaded && !currentError && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
             className={styles.successMessage}
           >
-            <CheckCircle className={styles.successIcon} size={16} />
-            Archivo cargado correctamente. 
-            {onFileProcess && (
-              <motion.button
-                onClick={() => onFileProcess(selectedFile)}
-                className={styles.processButton}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Procesar con IA
-              </motion.button>
-            )}
+            <CheckCircle size={16} className={styles.successIcon} />
+            <span>Archivo subido correctamente a la nube</span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Processing State */}
+      {/* Process Button */}
       <AnimatePresence>
-        {isProcessing && (
+        {selectedFile && isUploaded && !isProcessing && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+          >
+            <motion.button
+              onClick={handleProcessFile}
+              className={styles.processButton}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              PROCESAR CON IA
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Loading Overlay */}
+      <AnimatePresence>
+        {(isProcessing || isUploading) && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className={styles.processingOverlay}
           >
-            <LoadingSpinner size="medium" text="Analizando datos..." />
+            <LoadingSpinner size="medium" />
           </motion.div>
         )}
       </AnimatePresence>
@@ -259,4 +309,4 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   )
 }
 
-export default FileUploader 
+export default FileUploader

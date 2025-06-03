@@ -7,9 +7,11 @@ import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useDashboardMetrics, useConversations } from '@/presentation/store/useAppStore'
 import ExportPage from '@/presentation/components/ExportPage'
 import './App.css'
+import { useState } from 'react'
 
 const UploadPage = () => {
   const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   const handleFileSelect = (file: File) => {
     console.log('📁 Archivo seleccionado:', {
@@ -18,14 +20,16 @@ const UploadPage = () => {
       type: file?.type || 'Sin tipo',
       isValid: file instanceof File
     })
+    setSelectedFile(file)
     resetState()
   }
 
-  const handleFileProcess = async (file: File) => {
+  const handleFileProcess = async (file: File, uploadedPath?: string) => {
     console.log('🔄 Iniciando procesamiento desde App.tsx:', {
       file: file,
       isFile: file instanceof File,
       name: file?.name,
+      uploadedPath: uploadedPath,
       hasFile: !!file
     })
     
@@ -34,7 +38,16 @@ const UploadPage = () => {
       return
     }
     
+    // Procesar el archivo localmente (el archivo ya está en Supabase)
     await processFile(file)
+  }
+
+  const handleUploadComplete = (filePath: string, fileName: string) => {
+    console.log('☁️ Archivo subido a Supabase:', {
+      path: filePath,
+      name: fileName
+    })
+    // El archivo está listo para ser procesado cuando el usuario haga clic en "PROCESAR CON IA"
   }
 
   return (
@@ -45,16 +58,22 @@ const UploadPage = () => {
           Sube tu archivo Excel con las conversaciones para obtener análisis detallados
           de sentimientos, intenciones y métricas de rendimiento usando IA.
         </p>
+        <p>
+          <strong>✨ Nueva funcionalidad:</strong> Los archivos se guardan automáticamente en la nube 
+          para mayor seguridad y acceso desde cualquier dispositivo.
+        </p>
       </div>
 
       <FileUploader
         onFileSelect={handleFileSelect}
         onFileProcess={handleFileProcess}
+        onUploadComplete={handleUploadComplete}
         isProcessing={isProcessing}
         progress={progress}
         error={error}
         acceptedFormats={['.xlsx', '.xls', '.csv']}
         maxSizeInMB={25}
+        autoUpload={true}
       />
 
       {error && (
@@ -82,6 +101,16 @@ const UploadPage = () => {
           <strong>Nota:</strong> El sistema detecta automáticamente las columnas usando
           nombres en español e inglés. Los campos mínimos requeridos son Cliente y Teléfono.
         </p>
+        <div style={{ 
+          marginTop: '16px', 
+          padding: '12px', 
+          backgroundColor: '#f0f9ff', 
+          borderRadius: '8px',
+          border: '1px solid #0369a1'
+        }}>
+          <strong>🔒 Seguridad:</strong> Todos los archivos se almacenan de forma segura en Supabase Storage 
+          con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
+        </div>
       </div>
     </div>
   )
