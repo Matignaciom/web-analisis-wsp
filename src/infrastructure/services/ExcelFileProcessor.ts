@@ -407,15 +407,23 @@ export class ExcelFileProcessor implements IFileProcessor {
       return matches / maxLen
     }
 
-    // Mapeo inteligente con puntuación
-    for (const [fieldKey, possibleNames] of Object.entries(this.columnMappings)) {
+    // Array para rastrear columnas ya asignadas
+    const assignedColumns = new Set<number>()
+
+    // Mapeo inteligente con puntuación - orden de prioridad
+    const fieldPriorities = ['customerName', 'customerPhone', 'startDate', 'status', 'totalMessages', 'lastMessage', 'assignedAgent']
+    
+    for (const fieldKey of fieldPriorities) {
+      const columnOptions = this.columnMappings[fieldKey as keyof typeof this.columnMappings]
+      if (!columnOptions) continue
+      
       let bestMatch = { index: -1, score: 0 }
       
       headers.forEach((header, index) => {
-        if (!header || typeof header !== 'string') return
+        if (!header || typeof header !== 'string' || assignedColumns.has(index)) return
         
         // Buscar la mejor coincidencia para este header
-        for (const possibleName of possibleNames) {
+        for (const possibleName of columnOptions) {
           const similarity = calculateSimilarity(header, possibleName)
           
           if (similarity > bestMatch.score && similarity >= 0.7) { // Umbral de similitud
@@ -426,44 +434,49 @@ export class ExcelFileProcessor implements IFileProcessor {
       
       if (bestMatch.index !== -1) {
         mapping[fieldKey] = bestMatch.index
+        assignedColumns.add(bestMatch.index)
         console.log(`✅ Encontrada columna ${fieldKey} en índice ${bestMatch.index}: "${headers[bestMatch.index]}" (similitud: ${bestMatch.score.toFixed(2)})`)
       }
     }
 
-    // Análisis de patrones para columnas no mapeadas
+    // Análisis de patrones más específicos para campos críticos
     if (!mapping.customerName) {
-      console.log('🔍 Buscando columna de nombre por patrones...')
+      console.log('🔍 Buscando columna de nombre por patrones avanzados...')
       const nameIndex = headers.findIndex((header, index) => {
-        if (!header) return false
+        if (!header || assignedColumns.has(index)) return false
         const h = normalizeText(header)
         
-        // Patrones de nombre
+        // Patrones más específicos de nombre
         const namePatterns = [
           /^nom/i, /client/i, /customer/i, /usuario/i, /person/i, /contact/i,
-          /^name$/i, /^cliente$/i, /^nombre$/i, /^conta/i
+          /^name$/i, /^cliente$/i, /^nombre$/i, /^conta/i, /lead/i, /buyer/i
         ]
         
-        return namePatterns.some(pattern => pattern.test(header)) ||
-               // Si es la primera columna y parece texto
-               (index === 0 && h.length > 2 && h.length < 20 && !h.match(/^\d+$/))
+        const matchesPattern = namePatterns.some(pattern => pattern.test(header))
+        
+        // Si es la primera columna y no es número ni fecha, probablemente sea nombre
+        const isFirstColumnText = (index === 0 && h.length > 2 && h.length < 50 && 
+                                  !h.match(/^\d+$/) && !h.match(/fecha|date|time/i))
+        
+        return matchesPattern || isFirstColumnText
       })
       
       if (nameIndex !== -1) {
         mapping.customerName = nameIndex
+        assignedColumns.add(nameIndex)
         console.log(`🔧 Asignando columna de nombre por patrón: "${headers[nameIndex]}" (índice ${nameIndex})`)
       }
     }
 
     if (!mapping.customerPhone) {
-      console.log('🔍 Buscando columna de teléfono por patrones...')
-      const phoneIndex = headers.findIndex(header => {
-        if (!header) return false
-        // const h = normalizeText(header) // REMOVIDO - variable no utilizada
+      console.log('🔍 Buscando columna de teléfono por patrones avanzados...')
+      const phoneIndex = headers.findIndex((header, index) => {
+        if (!header || assignedColumns.has(index)) return false
         
-        // Patrones de teléfono
+        // Patrones más específicos de teléfono
         const phonePatterns = [
-          /tel/i, /phone/i, /cel/i, /whats/i, /numero/i, /mobile/i, /contact/i,
-          /^\d+$/, /^phone$/i, /^telefono$/i, /^numero$/i
+          /tel/i, /phone/i, /cel/i, /whats/i, /numero/i, /mobile/i, 
+          /contact/i, /movil/i, /fone/i, /^\d+$/
         ]
         
         return phonePatterns.some(pattern => pattern.test(header))
@@ -471,20 +484,20 @@ export class ExcelFileProcessor implements IFileProcessor {
       
       if (phoneIndex !== -1) {
         mapping.customerPhone = phoneIndex
+        assignedColumns.add(phoneIndex)
         console.log(`🔧 Asignando columna de teléfono por patrón: "${headers[phoneIndex]}" (índice ${phoneIndex})`)
       }
     }
 
     if (!mapping.startDate) {
-      console.log('🔍 Buscando columna de fecha por patrones...')
-      const dateIndex = headers.findIndex(header => {
-        if (!header) return false
-        // const h = normalizeText(header) // REMOVIDO - variable no utilizada
+      console.log('🔍 Buscando columna de fecha por patrones avanzados...')
+      const dateIndex = headers.findIndex((header, index) => {
+        if (!header || assignedColumns.has(index)) return false
         
-        // Patrones de fecha
+        // Patrones más específicos de fecha
         const datePatterns = [
           /fecha/i, /date/i, /time/i, /dia/i, /day/i, /created/i, /inicio/i,
-          /timestamp/i, /datetime/i, /^date$/i, /^fecha$/i
+          /timestamp/i, /datetime/i, /registro/i, /alta/i, /start/i
         ]
         
         return datePatterns.some(pattern => pattern.test(header))
@@ -492,57 +505,77 @@ export class ExcelFileProcessor implements IFileProcessor {
       
       if (dateIndex !== -1) {
         mapping.startDate = dateIndex
+        assignedColumns.add(dateIndex)
         console.log(`🔧 Asignando columna de fecha por patrón: "${headers[dateIndex]}" (índice ${dateIndex})`)
       }
     }
 
-    // Mapeo por posición como último recurso
+    // Mapeo por posición como último recurso - solo si no hay conflictos
     if (!mapping.customerName && headers.length > 0) {
-      mapping.customerName = 0
-      console.log(`🔧 Usando primera columna como nombre: "${headers[0]}"`)
+      // Buscar la primera columna no asignada que parezca texto
+      const availableIndex = headers.findIndex((header, index) => {
+        if (assignedColumns.has(index)) return false
+        // Evitar columnas que claramente no son nombres
+        const h = String(header || '').toLowerCase()
+        return !h.match(/^\d+$/) && !h.match(/fecha|date|phone|tel/i) && h.length > 0
+      })
+      
+      if (availableIndex !== -1) {
+        mapping.customerName = availableIndex
+        assignedColumns.add(availableIndex)
+        console.log(`🔧 Usando columna ${availableIndex} como nombre: "${headers[availableIndex]}"`)
+      } else if (!assignedColumns.has(0)) {
+        mapping.customerName = 0
+        assignedColumns.add(0)
+        console.log(`🔧 Usando primera columna como nombre: "${headers[0]}"`)
+      }
     }
 
     if (!mapping.customerPhone && headers.length > 1) {
-      // Buscar columna que contenga números o usar segunda columna
+      // Buscar columna que contenga números o usar columna disponible
       let phoneIndex = headers.findIndex((header, index) => {
-        if (!header || index === mapping.customerName) return false
-        const text = String(header).replace(/\s/g, '')
-        return text.match(/\d{8,}/) || text.match(/\+?\d/) || index === 1
+        if (assignedColumns.has(index)) return false
+        const text = String(header || '').replace(/\s/g, '')
+        return text.match(/\d{8,}/) || text.match(/\+?\d/) || text.match(/phone|tel|cel/i)
       })
       
-      if (phoneIndex === -1 && headers.length > 1) {
-        phoneIndex = mapping.customerName === 1 ? 0 : 1
+      if (phoneIndex === -1) {
+        // Buscar cualquier columna disponible que no sea la de nombre
+        phoneIndex = headers.findIndex((_, index) => 
+          !assignedColumns.has(index) && index !== mapping.customerName
+        )
       }
       
       if (phoneIndex !== -1) {
         mapping.customerPhone = phoneIndex
+        assignedColumns.add(phoneIndex)
         console.log(`🔧 Usando columna ${phoneIndex} como teléfono: "${headers[phoneIndex]}"`)
       }
     }
 
     if (!mapping.startDate && headers.length > 2) {
-      // Buscar una columna que pueda ser fecha
+      // Buscar una columna disponible que pueda ser fecha
       let dateIndex = headers.findIndex((header, index) => {
-        if (!header || index === mapping.customerName || index === mapping.customerPhone) return false
-        const h = String(header).toLowerCase()
-        return h.includes('fecha') || h.includes('date') || h.includes('time') || index === 2
+        if (assignedColumns.has(index)) return false
+        const h = String(header || '').toLowerCase()
+        return h.includes('fecha') || h.includes('date') || h.includes('time') || h.includes('created')
       })
       
-      if (dateIndex === -1 && headers.length > 2) {
-        // Usar la tercera columna disponible
-        dateIndex = [mapping.customerName, mapping.customerPhone].includes(2) ? 
-          (headers.length > 3 ? 3 : -1) : 2
+      if (dateIndex === -1) {
+        // Usar cualquier columna disponible restante
+        dateIndex = headers.findIndex((_, index) => !assignedColumns.has(index))
       }
       
       if (dateIndex !== -1) {
         mapping.startDate = dateIndex
+        assignedColumns.add(dateIndex)
         console.log(`🔧 Usando columna ${dateIndex} como fecha: "${headers[dateIndex]}"`)
       }
     }
 
     // Mapear columnas adicionales automáticamente
     const remainingHeaders = headers.map((header, index) => ({ header, index }))
-      .filter(({ index }) => !Object.values(mapping).includes(index))
+      .filter(({ index }) => !assignedColumns.has(index))
 
     for (const { header, index } of remainingHeaders) {
       if (!header) continue
@@ -552,42 +585,54 @@ export class ExcelFileProcessor implements IFileProcessor {
       // Estado/Status
       if (!mapping.status && (h.includes('estado') || h.includes('status') || h.includes('stage'))) {
         mapping.status = index
+        assignedColumns.add(index)
         console.log(`🔧 Auto-detectando estado en columna ${index}: "${header}"`)
       }
       
       // Mensajes
-      if (!mapping.totalMessages && (h.includes('mensaje') || h.includes('message') || h.includes('msg'))) {
+      else if (!mapping.totalMessages && (h.includes('mensaje') || h.includes('message') || h.includes('msg'))) {
         mapping.totalMessages = index
+        assignedColumns.add(index)
         console.log(`🔧 Auto-detectando mensajes en columna ${index}: "${header}"`)
       }
       
       // Agente
-      if (!mapping.assignedAgent && (h.includes('agente') || h.includes('agent') || h.includes('vendedor') || h.includes('responsable'))) {
+      else if (!mapping.assignedAgent && (h.includes('agente') || h.includes('agent') || h.includes('vendedor') || h.includes('responsable'))) {
         mapping.assignedAgent = index
+        assignedColumns.add(index)
         console.log(`🔧 Auto-detectando agente en columna ${index}: "${header}"`)
       }
     }
 
-    console.log('📋 Mapeo final avanzado:', mapping)
+    console.log('📋 Mapeo final mejorado:', mapping)
     console.log('📊 Columnas mapeadas:', Object.keys(mapping).length, 'de', headers.length, 'disponibles')
+    console.log('🔒 Columnas asignadas:', Array.from(assignedColumns))
     
     // Validar mapeo mínimo
     const requiredFields = ['customerName', 'customerPhone']
-    const missingFields = requiredFields.filter(field => !mapping[field])
+    const missingFields = requiredFields.filter(field => mapping[field] === undefined)
     
     if (missingFields.length > 0) {
       console.warn('⚠️ Campos requeridos faltantes:', missingFields)
       console.log('🔧 Intentando mapeo de emergencia...')
       
-      // Mapeo de emergencia basado en posición
+      // Mapeo de emergencia más inteligente
       if (!mapping.customerName && headers.length > 0) {
-        mapping.customerName = 0
-        console.log('🚨 Mapeo de emergencia: customerName = columna 0')
+        const emergencyNameIndex = headers.findIndex((_, index) => !assignedColumns.has(index))
+        if (emergencyNameIndex !== -1) {
+          mapping.customerName = emergencyNameIndex
+          assignedColumns.add(emergencyNameIndex)
+          console.log('🚨 Mapeo de emergencia: customerName = columna', emergencyNameIndex)
+        }
       }
       
       if (!mapping.customerPhone && headers.length > 1) {
-        mapping.customerPhone = 1
-        console.log('🚨 Mapeo de emergencia: customerPhone = columna 1')
+        const emergencyPhoneIndex = headers.findIndex((_, index) => !assignedColumns.has(index))
+        if (emergencyPhoneIndex !== -1) {
+          mapping.customerPhone = emergencyPhoneIndex
+          assignedColumns.add(emergencyPhoneIndex)
+          console.log('🚨 Mapeo de emergencia: customerPhone = columna', emergencyPhoneIndex)
+        }
       }
     }
     
