@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { Dashboard } from '@/presentation/components/Dashboard'
 import { FileUploader } from '@/presentation/components/FileUploader'
@@ -7,7 +7,7 @@ import ConversationModal from '@/presentation/components/ConversationModal'
 import CostOptimization from '@/presentation/components/CostOptimization'
 import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useConversationUpdater } from '@/hooks/useConversationUpdater'
-import { useDashboardMetrics, useConversations } from '@/presentation/store/useAppStore'
+import { useConversations } from '@/presentation/store/useAppStore'
 import type { Conversation } from '@/domain/entities/Conversation'
 import ExportPage from '@/presentation/components/ExportPage'
 import './App.css'
@@ -16,7 +16,6 @@ const SinglePageDashboard = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
-  const metrics = useDashboardMetrics()
   const conversations = useConversations()
   
   // Hook para actualizar conversaciones con análisis de IA
@@ -54,66 +53,6 @@ const SinglePageDashboard = () => {
     setIsModalOpen(false)
     setSelectedConversation(null)
   }
-
-  // Optimizar transformación de métricas con useMemo
-  const transformedMetrics = useMemo(() => {
-    if (!metrics) return undefined
-    
-    return {
-      totalConversations: metrics.totalConversations,
-      completedSales: metrics.completedSales,
-      abandonedChats: metrics.abandonedChats,
-      averageResponseTime: metrics.averageResponseTime,
-      conversionRate: metrics.conversionRate || 0,
-      satisfactionScore: metrics.satisfactionScore || 0
-    }
-  }, [metrics])
-
-  // Optimizar cálculos de datos dinámicos con useMemo
-  const dynamicData = useMemo(() => {
-    if (conversations.length === 0) return undefined
-    
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    const conversationsToday = conversations.filter(c => c.startDate >= today).length
-    const averageMessages = Math.round(
-      conversations.reduce((acc, c) => acc + c.totalMessages, 0) / conversations.length
-    ) || 0
-    const activeAgents = new Set(
-      conversations.filter(c => c.assignedAgent).map(c => c.assignedAgent)
-    ).size
-    const responseRate = Math.round(
-      (conversations.filter(c => c.status === 'completed').length / conversations.length) * 100
-    ) || 0
-
-    return [
-      {
-        title: 'Conversaciones Hoy',
-        value: conversationsToday,
-        type: 'number' as const,
-        category: 'Actividad'
-      },
-      {
-        title: 'Promedio Mensajes',
-        value: averageMessages,
-        type: 'number' as const,
-        category: 'Engagement'
-      },
-      {
-        title: 'Agentes Activos',
-        value: activeAgents,
-        type: 'number' as const,
-        category: 'Equipo'
-      },
-      {
-        title: 'Tasa Respuesta',
-        value: `${responseRate}%`,
-        type: 'percentage' as const,
-        category: 'Eficiencia'
-      }
-    ]
-  }, [conversations])
 
   return (
     <div className="single-page-dashboard">

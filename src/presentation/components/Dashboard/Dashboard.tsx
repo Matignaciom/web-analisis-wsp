@@ -8,10 +8,7 @@ import {
   TrendingDown, 
   Minus,
   MessageSquare,
-  Target,
-  DollarSign,
-  Star,
-  Activity
+  Target
 } from 'lucide-react'
 import type { Conversation } from '@/domain/entities/Conversation'
 import styles from './Dashboard.module.css'

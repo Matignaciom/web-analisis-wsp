@@ -458,7 +458,7 @@ export class ExcelFileProcessor implements IFileProcessor {
       console.log('🔍 Buscando columna de teléfono por patrones...')
       const phoneIndex = headers.findIndex(header => {
         if (!header) return false
-        const h = normalizeText(header)
+        // const h = normalizeText(header) // REMOVIDO - variable no utilizada
         
         // Patrones de teléfono
         const phonePatterns = [
@@ -479,7 +479,7 @@ export class ExcelFileProcessor implements IFileProcessor {
       console.log('🔍 Buscando columna de fecha por patrones...')
       const dateIndex = headers.findIndex(header => {
         if (!header) return false
-        const h = normalizeText(header)
+        // const h = normalizeText(header) // REMOVIDO - variable no utilizada
         
         // Patrones de fecha
         const datePatterns = [
