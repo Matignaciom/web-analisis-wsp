@@ -1,6 +1,7 @@
 import React from 'react'
 import { useAppStore } from '@/presentation/store/useAppStore'
 import type { Conversation } from '@/domain/entities/Conversation'
+import { ConversationStatus } from '@/domain/entities/Conversation'
 
 const SampleDataButton: React.FC = () => {
   const { setConversations } = useAppStore()
@@ -12,7 +13,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5493413796554',
         startDate: new Date('2024-01-15'),
         endDate: new Date('2024-01-15'),
-        status: 'pending',
+        status: ConversationStatus.PENDING,
         totalMessages: 3,
         lastMessage: 'Hola! Vi que estuviste interesado en nuestros productos. ¿Te gustaría que te cuente más sobre las opciones disponibles?',
         assignedAgent: undefined,
@@ -34,7 +35,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '3462080939',
         startDate: new Date('2024-01-14'),
         endDate: new Date('2024-01-14'),
-        status: 'pending',
+        status: ConversationStatus.PENDING,
         totalMessages: 2,
         lastMessage: 'Buenos días, quisiera información sobre precios y stock disponible',
         assignedAgent: undefined,
@@ -56,7 +57,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491134567890',
         startDate: new Date('2024-01-13'),
         endDate: new Date('2024-01-14'),
-        status: 'active',
+        status: ConversationStatus.ACTIVE,
         totalMessages: 8,
         lastMessage: 'Perfecto, me interesa. ¿Podemos agendar una llamada para cerrar la compra?',
         assignedAgent: 'María López',
@@ -78,7 +79,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491167890123',
         startDate: new Date('2024-01-12'),
         endDate: new Date('2024-01-13'),
-        status: 'completed',
+        status: ConversationStatus.COMPLETED,
         totalMessages: 12,
         lastMessage: 'Excelente servicio, muchas gracias! Ya realicé la transferencia.',
         assignedAgent: 'Juan Pérez',
@@ -100,7 +101,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491145678901',
         startDate: new Date('2024-01-11'),
         endDate: undefined,
-        status: 'abandoned',
+        status: ConversationStatus.ABANDONED,
         totalMessages: 4,
         lastMessage: 'Gracias por la info, voy a pensarlo y te aviso',
         assignedAgent: 'Ana Torres',
@@ -122,7 +123,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491123456789',
         startDate: new Date('2024-01-10'),
         endDate: new Date('2024-01-11'),
-        status: 'active',
+        status: ConversationStatus.ACTIVE,
         totalMessages: 6,
         lastMessage: 'Necesito ayuda con el producto que compré, no funciona correctamente',
         assignedAgent: 'Carlos Ruiz',
@@ -144,7 +145,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491198765432',
         startDate: new Date('2024-01-09'),
         endDate: new Date('2024-01-10'),
-        status: 'completed',
+        status: ConversationStatus.COMPLETED,
         totalMessages: 9,
         lastMessage: 'Todo perfecto, el producto llegó en tiempo y forma. ¡Recomendaré!',
         assignedAgent: 'Sofía Martínez',
@@ -166,7 +167,7 @@ const SampleDataButton: React.FC = () => {
         customerPhone: '5491187654321',
         startDate: new Date('2024-01-08'),
         endDate: undefined,
-        status: 'pending',
+        status: ConversationStatus.PENDING,
         totalMessages: 1,
         lastMessage: 'No se ha iniciado conversación',
         assignedAgent: undefined,

@@ -116,6 +116,11 @@ export class ExportService {
   }
 
   private addConversationsTableToPDF(pdf: jsPDF, conversations: Conversation[], yPosition: number): number {
+    if (yPosition > 240) {
+      pdf.addPage()
+      yPosition = 20
+    }
+
     pdf.setFontSize(16)
     pdf.text('LISTA DE CONVERSACIONES', 20, yPosition)
     yPosition += 15
@@ -127,7 +132,7 @@ export class ExportService {
       conv.totalMessages.toString(),
       conv.startDate.toLocaleDateString('es-ES'),
       conv.assignedAgent || 'Sin asignar',
-      this.truncateText(conv.lastMessage, 25)
+      this.truncateText(conv.lastMessage, 30)
     ])
 
     autoTable(pdf, {
@@ -136,23 +141,26 @@ export class ExportService {
       body: conversationsData,
       styles: { 
         fontSize: 7,
-        cellPadding: 3
+        cellPadding: 2,
+        overflow: 'linebreak',
+        halign: 'left'
       },
       headStyles: { 
         fillColor: [46, 204, 113],
-        fontSize: 8
+        fontSize: 8,
+        halign: 'center'
       },
       columnStyles: {
-        0: { cellWidth: 22 },  // Cliente
-        1: { cellWidth: 20 },  // Teléfono  
-        2: { cellWidth: 18 },  // Estado
-        3: { cellWidth: 12 },  // Mensajes
-        4: { cellWidth: 18 },  // Fecha
-        5: { cellWidth: 20 },  // Agente
-        6: { cellWidth: 35 }   // Último Mensaje
+        0: { cellWidth: 18 },  // Cliente - reducido de 22 a 18
+        1: { cellWidth: 16 },  // Teléfono - reducido de 20 a 16
+        2: { cellWidth: 16 },  // Estado - reducido de 18 a 16
+        3: { cellWidth: 10 },  // Mensajes - reducido de 12 a 10
+        4: { cellWidth: 16 },  // Fecha - reducido de 18 a 16
+        5: { cellWidth: 18 },  // Agente - reducido de 20 a 18
+        6: { cellWidth: 30 }   // Último Mensaje - reducido de 35 a 30
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'auto'
+      tableWidth: 'wrap'
     })
 
     return (pdf as any).lastAutoTable.finalY + 20
@@ -182,21 +190,24 @@ export class ExportService {
       body: analysisData,
       styles: { 
         fontSize: 7,
-        cellPadding: 3
+        cellPadding: 2,
+        overflow: 'linebreak',
+        halign: 'left'
       },
       headStyles: { 
         fillColor: [155, 89, 182],
-        fontSize: 8
+        fontSize: 8,
+        halign: 'center'
       },
       columnStyles: {
-        0: { cellWidth: 20 },  // ID Conversación
-        1: { cellWidth: 22 },  // Sentimiento
-        2: { cellWidth: 25 },  // Intención
-        3: { cellWidth: 15 },  // Confianza
-        4: { cellWidth: 63 }   // Resumen
+        0: { cellWidth: 18 },  // ID Conversación - reducido de 20 a 18
+        1: { cellWidth: 20 },  // Sentimiento - reducido de 22 a 20
+        2: { cellWidth: 22 },  // Intención - reducido de 25 a 22
+        3: { cellWidth: 12 },  // Confianza - reducido de 15 a 12
+        4: { cellWidth: 52 }   // Resumen - reducido de 63 a 52
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'auto'
+      tableWidth: 'wrap'
     })
 
     return (pdf as any).lastAutoTable.finalY + 20
