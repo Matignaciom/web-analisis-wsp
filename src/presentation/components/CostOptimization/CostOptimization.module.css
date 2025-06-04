@@ -2,11 +2,93 @@
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
   border: 1px solid #cbd5e1;
   border-radius: 16px;
-  padding: 24px;
   margin: 16px 0;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s ease;
 }
 
+.container:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Header compacto */
+.compactHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.compactHeader:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.headerLeft {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.compactTitle {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.compactInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.costSummary,
+.savingsSummary {
+  font-size: 0.875rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expandButton {
+  color: #6b7280;
+  transition: all 0.2s ease;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.expandButton:hover {
+  color: #374151;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* Contenido expandible */
+.expandedContent {
+  padding: 20px;
+  border-top: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.7);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estilos existentes actualizados */
 .header {
   display: flex;
   justify-content: space-between;
@@ -26,11 +108,12 @@
 .badge {
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.875rem;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.8rem;
   font-weight: 600;
   box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+  white-space: nowrap;
 }
 
 .currentConfig {
@@ -297,18 +380,25 @@
 
 @media (max-width: 768px) {
   .container {
-    padding: 16px;
     margin: 8px 0;
   }
   
-  .header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
+  .compactHeader {
+    padding: 12px 16px;
   }
   
-  .header h3 {
-    font-size: 1.3rem;
+  .expandedContent {
+    padding: 16px;
+  }
+  
+  .compactInfo {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .compactTitle {
+    font-size: 1.2rem;
   }
   
   .featureGrid {
@@ -321,6 +411,16 @@
 }
 
 @media (max-width: 480px) {
+  .compactHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .expandButton {
+    align-self: flex-end;
+  }
+  
   .configItem {
     flex-direction: column;
     align-items: flex-start;

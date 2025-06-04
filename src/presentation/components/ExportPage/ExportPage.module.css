@@ -14,12 +14,18 @@
   font-weight: 700;
   color: #1e293b;
   margin-bottom: 0.5rem;
+  word-wrap: break-word;
+  hyphens: auto;
 }
 
 .subtitle {
   font-size: 1.1rem;
   color: #64748b;
   margin: 0;
+  word-wrap: break-word;
+  max-width: 800px;
+  margin: 0 auto;
+  line-height: 1.6;
 }
 
 .content {
@@ -36,6 +42,8 @@
   padding: 1.5rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   border: 1px solid #e2e8f0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .sectionHeader {
@@ -52,6 +60,8 @@
   font-weight: 600;
   color: #1e293b;
   margin: 0;
+  word-wrap: break-word;
+  flex: 1;
 }
 
 .optionsGroup {
@@ -63,11 +73,12 @@
   font-weight: 600;
   color: #374151;
   margin-bottom: 1rem;
+  word-wrap: break-word;
 }
 
 .checkbox {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
   padding: 0.75rem;
   margin-bottom: 0.5rem;
@@ -76,6 +87,7 @@
   cursor: pointer;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+  min-height: 44px;
 }
 
 .checkbox:hover {
@@ -90,6 +102,8 @@
 .checkmark {
   color: #3b82f6;
   transition: all 0.2s;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .checkbox:hover .checkmark {
@@ -99,6 +113,11 @@
 .checkbox span:last-child {
   font-weight: 500;
   color: #374151;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  line-height: 1.4;
+  flex: 1;
 }
 
 .dateRange {
@@ -106,6 +125,13 @@
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.dateRange span {
+  white-space: nowrap;
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .dateInput {
@@ -126,19 +152,21 @@
 
 .dataSummary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .summaryCard {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 1rem;
   background: #f8fafc;
   border-radius: 0.75rem;
   border: 1px solid #e2e8f0;
+  text-align: center;
 }
 
 .summaryIcon {
@@ -146,13 +174,24 @@
   flex-shrink: 0;
 }
 
+.summaryContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+}
+
 .summaryContent h4 {
   font-size: 0.75rem;
   font-weight: 500;
   color: #6b7280;
-  margin: 0 0 0.25rem 0;
+  margin: 0;
   text-transform: uppercase;
   letter-spacing: 0.025em;
+  word-wrap: break-word;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .summaryValue {
@@ -160,6 +199,7 @@
   font-weight: 700;
   color: #1e293b;
   margin: 0;
+  word-wrap: break-word;
 }
 
 .previewInfo h4 {
@@ -167,6 +207,7 @@
   font-weight: 600;
   color: #374151;
   margin-bottom: 1rem;
+  word-wrap: break-word;
 }
 
 .contentList {
@@ -179,6 +220,9 @@
   padding: 0.5rem 0;
   color: #4b5563;
   font-size: 0.875rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
 }
 
 .exportActions {
@@ -186,6 +230,7 @@
   justify-content: center;
   gap: 1.5rem;
   margin-bottom: 3rem;
+  flex-wrap: wrap;
 }
 
 .exportButton {
@@ -202,6 +247,8 @@
   transition: all 0.3s ease;
   min-width: 180px;
   justify-content: center;
+  word-wrap: break-word;
+  white-space: nowrap;
 }
 
 .exportButton:disabled {
@@ -249,70 +296,75 @@
 }
 
 .formatInfo h4 {
-  font-size: 1.125rem;
+  font-size: 1.1rem;
   font-weight: 600;
   color: #1e293b;
   margin-bottom: 0.5rem;
+  word-wrap: break-word;
 }
 
 .formatInfo p {
-  color: #6b7280;
-  margin: 0;
+  color: #64748b;
   line-height: 1.6;
+  margin: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* Estado vacío */
 .emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 60vh;
+  background: white;
+  border-radius: 16px;
+  padding: 60px 20px;
   text-align: center;
-  padding: 2rem;
+  max-width: 600px;
+  margin: 40px auto;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
 }
 
 .emptyIcon {
-  color: #9ca3af;
-  margin-bottom: 2rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
 }
 
 .emptyState h2 {
-  font-size: 1.875rem;
-  font-weight: 700;
-  color: #374151;
+  color: #1e293b;
+  font-size: 1.8rem;
   margin-bottom: 1rem;
+  word-wrap: break-word;
 }
 
 .emptyState p {
+  color: #64748b;
   font-size: 1.1rem;
-  color: #6b7280;
-  max-width: 500px;
   line-height: 1.6;
   margin-bottom: 2rem;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .emptyActions {
   display: flex;
-  gap: 1rem;
+  justify-content: center;
 }
 
 .primaryButton {
-  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
   border: none;
-  padding: 0.875rem 1.5rem;
-  border-radius: 0.5rem;
+  padding: 12px 24px;
+  border-radius: 8px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-block;
 }
 
 .primaryButton:hover {
-  background: linear-gradient(135deg, #2563eb, #4f46e5);
-  transform: translateY(-1px);
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
 /* Responsive Design */
@@ -348,7 +400,7 @@
   }
   
   .dataSummary {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
   
   .dateRange {
@@ -364,7 +416,7 @@
 
 @media (max-width: 480px) {
   .dataSummary {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
   
   .summaryCard {
@@ -374,9 +426,15 @@
   .exportButton {
     padding: 0.875rem 1.5rem;
     font-size: 0.9rem;
+    min-width: auto;
   }
   
   .checkbox {
     padding: 0.5rem;
+    gap: 0.5rem;
+  }
+  
+  .checkbox span:last-child {
+    font-size: 0.875rem;
   }
 } 

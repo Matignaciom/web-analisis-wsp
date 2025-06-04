@@ -15,89 +15,162 @@ export class ExcelFileProcessor implements IFileProcessor {
   private readonly supportedFormats = ['.xlsx', '.xls', '.csv']
   private readonly maxFileSize = 25 * 1024 * 1024 // 25MB
   
-  // Mapeo de columnas esperadas (ultra-flexible para cualquier formato de Excel)
+  // Mapeo expandido de posibles nombres de columnas (más de 200 variaciones)
   private readonly columnMappings = {
     customerName: [
-      'cliente', 'customer_name', 'name', 'nombre', 'usuario', 'user', 'customer',
-      'nom', 'client', 'person', 'persona', 'contact', 'contacto', 'lead',
-      'prospecto', 'buyer', 'comprador', 'cliente_nombre', 'full_name', 
-      'nombre_completo', 'first_name', 'last_name', 'apellido'
+      // Español
+      'cliente', 'nombre', 'nom', 'client', 'customer_name', 'nombre_cliente', 'nom_client',
+      'usuario', 'persona', 'contacto', 'lead', 'prospecto', 'nom_contacto', 'contacto_nombre',
+      // Inglés  
+      'customer', 'name', 'client_name', 'contact', 'person', 'user', 'lead_name', 'prospect',
+      'full_name', 'first_name', 'last_name', 'contact_name', 'customer_contact', 'account_name',
+      // Portugués
+      'nome', 'cliente_nome', 'contato', 'pessoa', 'usuario_nome', 'lead_nome', 'prospect_nome',
+      // CRM common
+      'account', 'company', 'empresa', 'organization', 'org', 'titular', 'responsable', 'owner',
+      // Variaciones técnicas
+      'name_field', 'customer_field', 'contact_field', 'person_field', 'user_field',
+      // Variaciones cortas
+      'nom', 'cli', 'usr', 'per', 'con', 'acc'
     ],
     customerPhone: [
-      'telefono', 'phone', 'numero', 'whatsapp', 'celular', 'mobile', 'tel', 
-      'phone_number', 'numero_telefono', 'cel', 'movil', 'contact_number',
-      'numero_contacto', 'whatsapp_number', 'telefono_celular', 'cell_phone',
-      'phone_mobile', 'numero_cel', 'contact_phone', 'telefono_contacto'
+      // Español
+      'telefono', 'tel', 'celular', 'movil', 'whatsapp', 'numero', 'phone', 'cel', 'telefon',
+      'numero_telefono', 'telefono_contacto', 'tel_contacto', 'numero_celular', 'num_tel',
+      // Inglés
+      'phone', 'mobile', 'cell', 'telephone', 'phone_number', 'mobile_number', 'cell_number',
+      'contact_phone', 'primary_phone', 'work_phone', 'home_phone', 'phone_1', 'phone1',
+      // WhatsApp específico
+      'whatsapp', 'whats', 'wa', 'wpp', 'whatsapp_number', 'wa_number', 'whats_number',
+      // Portugués
+      'telefone', 'celular', 'fone', 'numero_telefone', 'tel_contato', 'cel_contato',
+      // Variaciones técnicas
+      'phone_field', 'mobile_field', 'contact_number', 'communication_number',
+      // Variaciones internacionales
+      'internacional', 'country_code', 'area_code', 'extension', 'ext'
     ],
     startDate: [
-      'fecha', 'date', 'fecha_inicio', 'start_date', 'timestamp', 'dia', 'day',
-      'fecha_creacion', 'creation_date', 'fecha_registro', 'register_date',
-      'created_at', 'fecha_conversacion', 'conversation_date', 'inicio',
-      'fecha_contacto', 'contact_date', 'fecha_lead', 'lead_date'
+      // Español
+      'fecha', 'fecha_inicio', 'fecha_creacion', 'fecha_contacto', 'inicio', 'creado', 'created',
+      'fecha_registro', 'registro', 'fecha_alta', 'alta', 'fecha_ingreso', 'ingreso',
+      // Inglés
+      'date', 'start_date', 'created_date', 'creation_date', 'contact_date', 'entry_date',
+      'registration_date', 'signup_date', 'join_date', 'first_contact', 'initial_date',
+      // Formatos comunes
+      'timestamp', 'datetime', 'created_at', 'updated_at', 'date_created', 'date_added',
+      // Portugués
+      'data', 'data_inicio', 'data_criacao', 'data_contato', 'data_registro', 'criado_em',
+      // Variaciones CRM
+      'lead_date', 'prospect_date', 'opportunity_date', 'deal_date', 'pipeline_date',
+      // Variaciones cortas
+      'dt', 'fecha_dt', 'date_dt', 'cr_date', 'reg_date'
     ],
     endDate: [
-      'fecha_fin', 'end_date', 'fecha_final', 'completed_date', 'fecha_cierre',
-      'close_date', 'finished_date', 'fecha_terminado', 'end_time'
+      // Español
+      'fecha_fin', 'fecha_final', 'fecha_cierre', 'fin', 'final', 'cierre', 'terminado',
+      'fecha_completado', 'completado', 'fecha_resuelto', 'resuelto', 'cerrado',
+      // Inglés
+      'end_date', 'final_date', 'close_date', 'completion_date', 'resolved_date', 'finished_date',
+      'closed_date', 'end_time', 'final_time', 'closure_date', 'resolution_date',
+      // Formatos comunes
+      'closed_at', 'completed_at', 'resolved_at', 'finished_at', 'end_timestamp',
+      // Portugués
+      'data_fim', 'data_final', 'data_fechamento', 'finalizado', 'resolvido', 'fechado',
+      // Estados específicos
+      'won_date', 'lost_date', 'cancelled_date', 'expired_date'
     ],
     status: [
-      'estado', 'status', 'estado_conversacion', 'conversation_status',
-      'stage', 'etapa', 'fase', 'state', 'situacion', 'condition',
-      'lead_status', 'deal_status', 'pipeline_stage', 'funnel_stage'
+      // Español
+      'estado', 'status', 'estatus', 'situacion', 'condicion', 'fase', 'etapa', 'stage',
+      'estado_conversacion', 'estado_lead', 'estado_cliente', 'situacion_actual',
+      // Inglés  
+      'status', 'state', 'stage', 'phase', 'condition', 'situation', 'current_status',
+      'deal_status', 'lead_status', 'opportunity_status', 'pipeline_stage', 'sales_stage',
+      // CRM específico
+      'pipeline', 'funnel', 'workflow', 'process', 'step', 'milestone', 'progress',
+      // Portugués
+      'status', 'estado', 'situacao', 'condicao', 'fase', 'estagio', 'etapa',
+      // Variaciones específicas
+      'conversation_status', 'chat_status', 'contact_status', 'customer_status',
+      // Variaciones cortas
+      'stat', 'st', 'est', 'sts'
     ],
     totalMessages: [
-      'mensajes', 'messages', 'total_messages', 'cantidad_mensajes',
-      'num_messages', 'message_count', 'total_msgs', 'cantidad_msgs',
-      'interactions', 'interacciones', 'chats', 'responses', 'respuestas'
+      // Español
+      'mensajes', 'total_mensajes', 'num_mensajes', 'cantidad_mensajes', 'msgs', 'messages',
+      'conversaciones', 'intercambios', 'respuestas', 'interacciones', 'comunicaciones',
+      // Inglés
+      'messages', 'total_messages', 'message_count', 'msg_count', 'conversation_count',
+      'interactions', 'exchanges', 'communications', 'responses', 'replies',
+      // Específico chat
+      'chat_messages', 'whatsapp_messages', 'text_messages', 'message_volume',
+      // Portugués
+      'mensagens', 'total_mensagens', 'num_mensagens', 'quantidade_mensagens',
+      // Métricas
+      'activity', 'engagement', 'touch_points', 'contact_points', 'communication_frequency'
     ],
     lastMessage: [
-      'ultimo_mensaje', 'last_message', 'mensaje_final', 'final_message',
-      'latest_message', 'recent_message', 'mensaje_reciente', 'last_msg',
-      'ultimo_msg', 'latest_msg', 'final_msg', 'mensaje_ultimo'
+      // Español
+      'ultimo_mensaje', 'mensaje_final', 'ultimo_msg', 'msg_final', 'texto_final',
+      'contenido_ultimo', 'ultimo_texto', 'mensaje_reciente', 'ultimo_contacto',
+      // Inglés
+      'last_message', 'final_message', 'latest_message', 'recent_message', 'last_msg',
+      'final_msg', 'last_text', 'recent_text', 'latest_communication', 'last_contact',
+      // Específico contenido
+      'message_content', 'text_content', 'content', 'body', 'message_body', 'text_body',
+      'conversation_content', 'chat_content', 'last_communication_content',
+      // Portugués
+      'ultima_mensagem', 'mensagem_final', 'ultimo_contato', 'texto_final', 'conteudo_ultimo'
     ],
     assignedAgent: [
-      'agente', 'agent', 'vendedor', 'assigned_agent', 'seller', 'sales_agent',
-      'representative', 'representante', 'asesor', 'advisor', 'consultor',
-      'consultant', 'assigned_to', 'asignado_a', 'responsible', 'responsable',
-      'owner', 'propietario', 'sales_rep', 'account_manager'
+      // Español
+      'agente', 'vendedor', 'representante', 'asesor', 'consultor', 'responsable', 'asignado',
+      'agente_asignado', 'vendedor_asignado', 'rep_ventas', 'ejecutivo', 'specialist',
+      // Inglés
+      'agent', 'sales_rep', 'representative', 'salesperson', 'advisor', 'consultant',
+      'assigned_agent', 'sales_agent', 'account_manager', 'relationship_manager', 'owner',
+      'assigned_to', 'handled_by', 'managed_by', 'rep', 'specialist', 'executive',
+      // Roles específicos
+      'account_executive', 'sales_executive', 'business_development', 'bd_rep', 'closer',
+      // Portugués
+      'agente', 'vendedor', 'representante', 'consultor', 'responsavel', 'designado',
+      // Variaciones organizacionales
+      'team', 'department', 'division', 'unit', 'group', 'squad'
     ],
-    source: [
-      'origen', 'source', 'canal', 'channel', 'campaign', 'campaña',
-      'medium', 'medio', 'platform', 'plataforma', 'referrer', 'referencia',
-      'utm_source', 'traffic_source', 'lead_source', 'fuente'
-    ],
-    responseTime: [
-      'tiempo_respuesta', 'response_time', 'tiempo', 'time_to_respond',
-      'reply_time', 'tiempo_responder', 'response_delay', 'reaction_time',
-      'tiempo_reaccion', 'first_response_time', 'avg_response_time'
+    metadata: [
+      // Información adicional
+      'notas', 'observaciones', 'comentarios', 'descripcion', 'detalles', 'info_adicional',
+      'notes', 'observations', 'comments', 'description', 'details', 'additional_info',
+      'remarks', 'memo', 'summary', 'overview', 'context', 'background',
+      // Datos técnicos
+      'metadata', 'custom_fields', 'properties', 'attributes', 'tags', 'labels',
+      'categories', 'classification', 'type', 'source', 'channel', 'medium',
+      // Portugués
+      'notas', 'observacoes', 'comentarios', 'descricao', 'detalhes', 'informacao_adicional'
     ],
     satisfaction: [
-      'satisfaccion', 'satisfaction', 'rating', 'puntuacion', 'score',
-      'calificacion', 'feedback', 'review', 'opinion', 'customer_satisfaction',
-      'csat', 'nps', 'rating_score', 'satisfaction_score'
+      // Español
+      'satisfaccion', 'rating', 'calificacion', 'puntuacion', 'score', 'valoracion',
+      'evaluacion', 'feedback', 'opinion', 'experiencia', 'nps', 'csat',
+      // Inglés
+      'satisfaction', 'rating', 'score', 'evaluation', 'feedback', 'review',
+      'experience', 'quality', 'service_rating', 'customer_satisfaction', 'nps', 'csat',
+      // Métricas específicas
+      'net_promoter_score', 'customer_effort_score', 'ces', 'quality_score',
+      // Portugués
+      'satisfacao', 'avaliacao', 'pontuacao', 'classificacao', 'feedback', 'experiencia'
     ],
-    purchaseValue: [
-      'valor_compra', 'purchase_value', 'monto', 'total', 'amount', 'value',
-      'deal_value', 'sale_amount', 'purchase_amount', 'order_value',
-      'ticket_size', 'revenue', 'ingresos', 'venta_total', 'precio_final'
-    ],
-    conversionRate: [
-      'conversion_rate', 'tasa_conversion', 'rate', 'tasa', 'percentage',
-      'porcentaje', 'success_rate', 'close_rate', 'win_rate'
-    ],
-    interest: [
-      'interes', 'interest', 'producto_interes', 'product_interest',
-      'item_interest', 'interested_in', 'product', 'producto', 'service',
-      'servicio', 'category', 'categoria', 'offering', 'oferta'
-    ],
-    salesPotential: [
-      'potencial_venta', 'sales_potential', 'potential', 'potencial',
-      'lead_score', 'score_lead', 'qualification', 'calificacion',
-      'priority', 'prioridad', 'quality', 'calidad', 'likelihood', 'probabilidad'
-    ],
-    notes: [
-      'notas', 'notes', 'comments', 'comentarios', 'observations',
-      'observaciones', 'remarks', 'additional_info', 'info_adicional',
-      'description', 'descripcion', 'details', 'detalles'
+    responseTime: [
+      // Español
+      'tiempo_respuesta', 'response_time', 'tiempo_atencion', 'duracion', 'demora',
+      'tiempo_resolucion', 'tiempo_contacto', 'velocidad_respuesta', 'latencia',
+      // Inglés
+      'response_time', 'reply_time', 'resolution_time', 'handling_time', 'processing_time',
+      'turnaround_time', 'cycle_time', 'lead_time', 'wait_time', 'service_time',
+      // Métricas temporales
+      'sla', 'efficiency', 'speed', 'velocity', 'performance', 'productivity',
+      // Portugués
+      'tempo_resposta', 'tempo_atendimento', 'tempo_resolucao', 'duracao', 'latencia'
     ]
   }
 
@@ -290,90 +363,155 @@ export class ExcelFileProcessor implements IFileProcessor {
   private detectColumnMapping(headers: string[]): Record<string, number> {
     const mapping: Record<string, number> = {}
     
-    console.log('🔍 Iniciando detección de columnas...')
+    console.log('🔍 Iniciando detección avanzada de columnas...')
     console.log('📋 Headers disponibles:', headers)
 
-    // Primero intentar mapeo estricto basado en columnMappings
-    for (const [key, possibleNames] of Object.entries(this.columnMappings)) {
-      const foundIndex = headers.findIndex(header => {
-        if (!header || typeof header !== 'string') return false
-        const headerLower = header.toLowerCase().trim()
-        return possibleNames.some(name => headerLower.includes(name.toLowerCase()))
+    // Función auxiliar para normalizar texto
+    const normalizeText = (text: string): string => {
+      return text.toLowerCase()
+        .trim()
+        .replace(/[áàäâ]/g, 'a')
+        .replace(/[éèëê]/g, 'e')
+        .replace(/[íìïî]/g, 'i')
+        .replace(/[óòöô]/g, 'o')
+        .replace(/[úùüû]/g, 'u')
+        .replace(/[ñ]/g, 'n')
+        .replace(/[ç]/g, 'c')
+        .replace(/[_\-\s\.]/g, '')
+        .replace(/[^\w]/g, '')
+    }
+
+    // Función para calcular similitud entre strings
+    const calculateSimilarity = (str1: string, str2: string): number => {
+      const normalized1 = normalizeText(str1)
+      const normalized2 = normalizeText(str2)
+      
+      // Coincidencia exacta
+      if (normalized1 === normalized2) return 1.0
+      
+      // Contiene la palabra completa
+      if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) return 0.9
+      
+      // Similitud de Levenshtein simplificada
+      const maxLen = Math.max(normalized1.length, normalized2.length)
+      const minLen = Math.min(normalized1.length, normalized2.length)
+      
+      if (maxLen === 0) return 1.0
+      if (minLen / maxLen < 0.5) return 0.0 // Muy diferentes en longitud
+      
+      let matches = 0
+      for (let i = 0; i < minLen; i++) {
+        if (normalized1[i] === normalized2[i]) matches++
+      }
+      
+      return matches / maxLen
+    }
+
+    // Mapeo inteligente con puntuación
+    for (const [fieldKey, possibleNames] of Object.entries(this.columnMappings)) {
+      let bestMatch = { index: -1, score: 0 }
+      
+      headers.forEach((header, index) => {
+        if (!header || typeof header !== 'string') return
+        
+        // Buscar la mejor coincidencia para este header
+        for (const possibleName of possibleNames) {
+          const similarity = calculateSimilarity(header, possibleName)
+          
+          if (similarity > bestMatch.score && similarity >= 0.7) { // Umbral de similitud
+            bestMatch = { index, score: similarity }
+          }
+        }
       })
       
-      if (foundIndex !== -1) {
-        mapping[key] = foundIndex
-        console.log(`✅ Encontrada columna ${key} en índice ${foundIndex}: "${headers[foundIndex]}"`)
+      if (bestMatch.index !== -1) {
+        mapping[fieldKey] = bestMatch.index
+        console.log(`✅ Encontrada columna ${fieldKey} en índice ${bestMatch.index}: "${headers[bestMatch.index]}" (similitud: ${bestMatch.score.toFixed(2)})`)
       }
     }
 
-    // Si no encontramos las columnas críticas, intentemos mapeo inteligente
+    // Análisis de patrones para columnas no mapeadas
     if (!mapping.customerName) {
-      console.log('🔍 Buscando columna de nombre/cliente...')
-      const nameIndex = headers.findIndex(header => {
+      console.log('🔍 Buscando columna de nombre por patrones...')
+      const nameIndex = headers.findIndex((header, index) => {
         if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.includes('nom') || h.includes('client') || h.includes('usuario') || 
-               h.includes('person') || h.includes('contact') || h.includes('customer') ||
-               h === 'name' || h === 'cliente' || h === 'nombre' ||
-               // Si es una columna de texto corta, podría ser nombre
-               (h.length <= 15 && h.match(/[a-z]/i) && !h.match(/\d/))
+        const h = normalizeText(header)
+        
+        // Patrones de nombre
+        const namePatterns = [
+          /^nom/i, /client/i, /customer/i, /usuario/i, /person/i, /contact/i,
+          /^name$/i, /^cliente$/i, /^nombre$/i, /^conta/i
+        ]
+        
+        return namePatterns.some(pattern => pattern.test(header)) ||
+               // Si es la primera columna y parece texto
+               (index === 0 && h.length > 2 && h.length < 20 && !h.match(/^\d+$/))
       })
+      
       if (nameIndex !== -1) {
         mapping.customerName = nameIndex
-        console.log(`🔧 Asignando columna de nombre: "${headers[nameIndex]}" (índice ${nameIndex})`)
+        console.log(`🔧 Asignando columna de nombre por patrón: "${headers[nameIndex]}" (índice ${nameIndex})`)
       }
     }
 
     if (!mapping.customerPhone) {
-      console.log('🔍 Buscando columna de teléfono...')
+      console.log('🔍 Buscando columna de teléfono por patrones...')
       const phoneIndex = headers.findIndex(header => {
         if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.includes('tel') || h.includes('phone') || h.includes('cel') || 
-               h.includes('whats') || h.includes('numero') || h.includes('mobil') ||
-               h.includes('contact') || h === 'phone' || h === 'telefono'
+        const h = normalizeText(header)
+        
+        // Patrones de teléfono
+        const phonePatterns = [
+          /tel/i, /phone/i, /cel/i, /whats/i, /numero/i, /mobile/i, /contact/i,
+          /^\d+$/, /^phone$/i, /^telefono$/i, /^numero$/i
+        ]
+        
+        return phonePatterns.some(pattern => pattern.test(header))
       })
+      
       if (phoneIndex !== -1) {
         mapping.customerPhone = phoneIndex
-        console.log(`🔧 Asignando columna de teléfono: "${headers[phoneIndex]}" (índice ${phoneIndex})`)
+        console.log(`🔧 Asignando columna de teléfono por patrón: "${headers[phoneIndex]}" (índice ${phoneIndex})`)
       }
     }
 
     if (!mapping.startDate) {
-      console.log('🔍 Buscando columna de fecha...')
+      console.log('🔍 Buscando columna de fecha por patrones...')
       const dateIndex = headers.findIndex(header => {
         if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.includes('fecha') || h.includes('date') || h.includes('time') ||
-               h.includes('dia') || h.includes('day') || h === 'fecha' || h === 'date'
+        const h = normalizeText(header)
+        
+        // Patrones de fecha
+        const datePatterns = [
+          /fecha/i, /date/i, /time/i, /dia/i, /day/i, /created/i, /inicio/i,
+          /timestamp/i, /datetime/i, /^date$/i, /^fecha$/i
+        ]
+        
+        return datePatterns.some(pattern => pattern.test(header))
       })
+      
       if (dateIndex !== -1) {
         mapping.startDate = dateIndex
-        console.log(`🔧 Asignando columna de fecha: "${headers[dateIndex]}" (índice ${dateIndex})`)
+        console.log(`🔧 Asignando columna de fecha por patrón: "${headers[dateIndex]}" (índice ${dateIndex})`)
       }
     }
 
-    // Si aún no tenemos columnas críticas, usar inferencia basada en posición
+    // Mapeo por posición como último recurso
     if (!mapping.customerName && headers.length > 0) {
-      // Usar la primera columna como nombre si parece texto
-      const firstColHeader = headers[0]
-      if (firstColHeader && typeof firstColHeader === 'string') {
-        mapping.customerName = 0
-        console.log(`🔧 Usando primera columna como nombre: "${firstColHeader}"`)
-      }
+      mapping.customerName = 0
+      console.log(`🔧 Usando primera columna como nombre: "${headers[0]}"`)
     }
 
     if (!mapping.customerPhone && headers.length > 1) {
-      // Buscar la primera columna que pueda contener números o la segunda columna
+      // Buscar columna que contenga números o usar segunda columna
       let phoneIndex = headers.findIndex((header, index) => {
-        if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.match(/\d/) || h.includes('numero') || index === 1
+        if (!header || index === mapping.customerName) return false
+        const text = String(header).replace(/\s/g, '')
+        return text.match(/\d{8,}/) || text.match(/\+?\d/) || index === 1
       })
       
       if (phoneIndex === -1 && headers.length > 1) {
-        phoneIndex = 1 // Usar segunda columna como fallback
+        phoneIndex = mapping.customerName === 1 ? 0 : 1
       }
       
       if (phoneIndex !== -1) {
@@ -383,15 +521,17 @@ export class ExcelFileProcessor implements IFileProcessor {
     }
 
     if (!mapping.startDate && headers.length > 2) {
-      // Buscar una columna que pueda ser fecha o usar la tercera
+      // Buscar una columna que pueda ser fecha
       let dateIndex = headers.findIndex((header, index) => {
-        if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.includes('fecha') || h.includes('date') || index === 2
+        if (!header || index === mapping.customerName || index === mapping.customerPhone) return false
+        const h = String(header).toLowerCase()
+        return h.includes('fecha') || h.includes('date') || h.includes('time') || index === 2
       })
       
       if (dateIndex === -1 && headers.length > 2) {
-        dateIndex = 2 // Usar tercera columna como fallback
+        // Usar la tercera columna disponible
+        dateIndex = [mapping.customerName, mapping.customerPhone].includes(2) ? 
+          (headers.length > 3 ? 3 : -1) : 2
       }
       
       if (dateIndex !== -1) {
@@ -400,21 +540,56 @@ export class ExcelFileProcessor implements IFileProcessor {
       }
     }
 
-    // Mapear columnas adicionales si están disponibles
-    if (!mapping.status && headers.length > 0) {
-      const statusIndex = headers.findIndex(header => {
-        if (!header) return false
-        const h = header.toLowerCase().trim()
-        return h.includes('estado') || h.includes('status') || h.includes('stat')
-      })
-      if (statusIndex !== -1) {
-        mapping.status = statusIndex
-        console.log(`🔧 Encontrada columna de estado: "${headers[statusIndex]}" (índice ${statusIndex})`)
+    // Mapear columnas adicionales automáticamente
+    const remainingHeaders = headers.map((header, index) => ({ header, index }))
+      .filter(({ index }) => !Object.values(mapping).includes(index))
+
+    for (const { header, index } of remainingHeaders) {
+      if (!header) continue
+      
+      const h = normalizeText(header)
+      
+      // Estado/Status
+      if (!mapping.status && (h.includes('estado') || h.includes('status') || h.includes('stage'))) {
+        mapping.status = index
+        console.log(`🔧 Auto-detectando estado en columna ${index}: "${header}"`)
+      }
+      
+      // Mensajes
+      if (!mapping.totalMessages && (h.includes('mensaje') || h.includes('message') || h.includes('msg'))) {
+        mapping.totalMessages = index
+        console.log(`🔧 Auto-detectando mensajes en columna ${index}: "${header}"`)
+      }
+      
+      // Agente
+      if (!mapping.assignedAgent && (h.includes('agente') || h.includes('agent') || h.includes('vendedor') || h.includes('responsable'))) {
+        mapping.assignedAgent = index
+        console.log(`🔧 Auto-detectando agente en columna ${index}: "${header}"`)
       }
     }
 
-    console.log('📋 Mapeo final de columnas:', mapping)
+    console.log('📋 Mapeo final avanzado:', mapping)
     console.log('📊 Columnas mapeadas:', Object.keys(mapping).length, 'de', headers.length, 'disponibles')
+    
+    // Validar mapeo mínimo
+    const requiredFields = ['customerName', 'customerPhone']
+    const missingFields = requiredFields.filter(field => !mapping[field])
+    
+    if (missingFields.length > 0) {
+      console.warn('⚠️ Campos requeridos faltantes:', missingFields)
+      console.log('🔧 Intentando mapeo de emergencia...')
+      
+      // Mapeo de emergencia basado en posición
+      if (!mapping.customerName && headers.length > 0) {
+        mapping.customerName = 0
+        console.log('🚨 Mapeo de emergencia: customerName = columna 0')
+      }
+      
+      if (!mapping.customerPhone && headers.length > 1) {
+        mapping.customerPhone = 1
+        console.log('🚨 Mapeo de emergencia: customerPhone = columna 1')
+      }
+    }
     
     return mapping
   }

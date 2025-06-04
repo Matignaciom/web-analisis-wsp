@@ -4,6 +4,7 @@ import { Dashboard } from '@/presentation/components/Dashboard'
 import { FileUploader } from '@/presentation/components/FileUploader'
 import { ConversationsTable } from '@/presentation/components/ConversationsTable'
 import ConversationModal from '@/presentation/components/ConversationModal'
+import CostOptimization from '@/presentation/components/CostOptimization'
 import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useConversationUpdater } from '@/hooks/useConversationUpdater'
 import { useDashboardMetrics, useConversations } from '@/presentation/store/useAppStore'
@@ -11,10 +12,7 @@ import type { Conversation } from '@/domain/entities/Conversation'
 import ExportPage from '@/presentation/components/ExportPage'
 import './App.css'
 
-type ActiveSection = 'upload' | 'dashboard' | 'conversations' | 'export'
-
-const LandingDashboard = () => {
-  const [activeSection, setActiveSection] = useState<ActiveSection>('upload')
+const SinglePageDashboard = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
@@ -37,10 +35,8 @@ const LandingDashboard = () => {
     
     await processFile(file)
     
-    // Habilitar automáticamente la pestaña de Dashboard después del procesamiento
     if (!error) {
-      console.log('✅ Archivo procesado, habilitando pestañas')
-      setActiveSection('dashboard')
+      console.log('✅ Archivo procesado exitosamente')
     }
   }
 
@@ -120,7 +116,7 @@ const LandingDashboard = () => {
   }, [conversations])
 
   return (
-    <div className="landing-dashboard">
+    <div className="single-page-dashboard">
       {/* Header Hero Section */}
       <div className="hero-section">
         <div className="hero-content">
@@ -142,158 +138,170 @@ const LandingDashboard = () => {
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="navigation-tabs">
-        <button 
-          className={`nav-tab ${activeSection === 'upload' ? 'active' : ''}`}
-          onClick={() => setActiveSection('upload')}
-        >
-          📤 Subir Datos
-        </button>
-        <button 
-          className={`nav-tab ${activeSection === 'dashboard' ? 'active' : ''}`}
-          onClick={() => setActiveSection('dashboard')}
-          disabled={conversations.length === 0}
-        >
-          📊 Dashboard
-        </button>
-        <button 
-          className={`nav-tab ${activeSection === 'conversations' ? 'active' : ''}`}
-          onClick={() => setActiveSection('conversations')}
-          disabled={conversations.length === 0}
-        >
-          💬 Conversaciones
-        </button>
-        <button 
-          className={`nav-tab ${activeSection === 'export' ? 'active' : ''}`}
-          onClick={() => setActiveSection('export')}
-          disabled={conversations.length === 0}
-        >
-          📋 Exportar
-        </button>
+      {/* Upload Section - Siempre visible */}
+      <div className="upload-section">
+        <div className="section-header">
+          <h2>📊 Cargar Archivo de Conversaciones</h2>
+          <p>
+            Sube tu archivo Excel o CSV con las conversaciones para obtener análisis detallados
+            usando IA avanzada para sentimientos, intenciones y métricas.
+          </p>
+        </div>
+
+        <FileUploader
+          onFileSelect={handleFileSelect}
+          onFileProcess={handleFileProcess}
+          onUploadComplete={handleUploadComplete}
+          isProcessing={isProcessing}
+          progress={progress}
+          error={error}
+          acceptedFormats={['.xlsx', '.xls', '.csv']}
+          maxSizeInMB={25}
+          autoUpload={true}
+        />
+
+        {error && (
+          <div className="error-message">
+            <h3>❌ Error en el procesamiento</h3>
+            <p>{error}</p>
+            <button onClick={resetState} className="retry-button">
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        <div className="format-guide">
+          <h3>💡 Formato esperado del archivo:</h3>
+          <div className="format-columns">
+            <div className="format-column">
+              <h4>Columnas requeridas:</h4>
+              <ul>
+                <li><strong>Cliente/Nombre:</strong> Nombre del cliente</li>
+                <li><strong>Teléfono/WhatsApp:</strong> Número de teléfono</li>
+                <li><strong>Fecha:</strong> Fecha de inicio</li>
+                <li><strong>Estado:</strong> activo, completado, abandonado, pendiente</li>
+              </ul>
+            </div>
+            <div className="format-column">
+              <h4>Columnas opcionales:</h4>
+              <ul>
+                <li><strong>Mensajes:</strong> Cantidad total de mensajes</li>
+                <li><strong>Último mensaje:</strong> Contenido del último mensaje</li>
+                <li><strong>Agente:</strong> Agente asignado</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="security-note">
+            <strong>🔒 Seguridad:</strong> Todos los archivos se almacenan de forma segura en Supabase Storage 
+            con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
+          </div>
+        </div>
       </div>
 
-      {/* Content Section */}
-      <div className="content-section">
-        {activeSection === 'upload' && (
-          <div className="upload-section">
-            <div className="section-header">
-              <h2>📊 Cargar Archivo de Conversaciones</h2>
-              <p>
-                Sube tu archivo Excel o CSV con las conversaciones para obtener análisis detallados
-                usando IA avanzada para sentimientos, intenciones y métricas.
-              </p>
-            </div>
-
-            <FileUploader
-              onFileSelect={handleFileSelect}
-              onFileProcess={handleFileProcess}
-              onUploadComplete={handleUploadComplete}
-              isProcessing={isProcessing}
-              progress={progress}
-              error={error}
-              acceptedFormats={['.xlsx', '.xls', '.csv']}
-              maxSizeInMB={25}
-              autoUpload={true}
-            />
-
-            {error && (
-              <div className="error-message">
-                <h3>❌ Error en el procesamiento</h3>
-                <p>{error}</p>
-                <button onClick={resetState} className="retry-button">
-                  Reintentar
-                </button>
-              </div>
-            )}
-
-            <div className="format-guide">
-              <h3>💡 Formato esperado del archivo:</h3>
-              <div className="format-columns">
-                <div className="format-column">
-                  <h4>Columnas requeridas:</h4>
-                  <ul>
-                    <li><strong>Cliente/Nombre:</strong> Nombre del cliente</li>
-                    <li><strong>Teléfono/WhatsApp:</strong> Número de teléfono</li>
-                    <li><strong>Fecha:</strong> Fecha de inicio</li>
-                    <li><strong>Estado:</strong> activo, completado, abandonado, pendiente</li>
-                  </ul>
-                </div>
-                <div className="format-column">
-                  <h4>Columnas opcionales:</h4>
-                  <ul>
-                    <li><strong>Mensajes:</strong> Cantidad total de mensajes</li>
-                    <li><strong>Último mensaje:</strong> Contenido del último mensaje</li>
-                    <li><strong>Agente:</strong> Agente asignado</li>
-                  </ul>
-                </div>
-              </div>
-              
-              <div className="security-note">
-                <strong>🔒 Seguridad:</strong> Todos los archivos se almacenan de forma segura en Supabase Storage 
-                con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
-              </div>
-            </div>
+      {/* Dashboard Section - Visible cuando hay datos */}
+      {conversations.length > 0 && (
+        <div className="dashboard-section">
+          <div className="section-header">
+            <h2>📊 Dashboard de Análisis</h2>
+            <p>Métricas y insights de tus conversaciones de WhatsApp</p>
           </div>
-        )}
+          
+          <Dashboard 
+            conversations={conversations}
+            metrics={{
+              totalConversations: conversations.length,
+              completedSales: conversations.filter(c => c.status === 'completed').length,
+              abandonedChats: conversations.filter(c => c.status === 'abandoned').length,
+              averageResponseTime: conversations.length > 0 ? 
+                `${Math.round(conversations.reduce((sum, c) => sum + (c.metadata?.responseTime || 5), 0) / conversations.length)} min` : 
+                '0 min'
+            }}
+            dynamicData={[
+              {
+                title: 'Clientes Únicos',
+                value: new Set(conversations.map(c => c.customerPhone)).size,
+                type: 'number',
+                category: 'Alcance'
+              },
+              {
+                title: 'Total Mensajes',
+                value: conversations.reduce((sum, c) => sum + (c.totalMessages || 0), 0),
+                type: 'number',
+                category: 'Actividad'
+              },
+              {
+                title: 'Tasa de Conversión',
+                value: conversations.length > 0 ? 
+                  Math.round((conversations.filter(c => c.status === 'completed').length / conversations.length) * 100) : 0,
+                type: 'percentage',
+                category: 'Rendimiento'
+              },
+              {
+                title: 'Agentes Activos',
+                value: new Set(conversations.filter(c => c.assignedAgent).map(c => c.assignedAgent)).size,
+                type: 'number',
+                category: 'Equipo'
+              }
+            ]}
+          />
+          
+          {/* Cost Optimization - Desplegable en el dashboard */}
+          <CostOptimization 
+            conversationCount={conversations.length}
+            className="cost-optimization-widget"
+          />
+        </div>
+      )}
 
-        {activeSection === 'dashboard' && (
-          <div className="dashboard-section">
-            <div className="section-header">
-              <h2>📊 Dashboard de Análisis</h2>
-              <p>Vista general de las métricas y análisis de tus conversaciones</p>
-            </div>
+      {/* Cost Optimization - Solo visible si no hay conversaciones */}
+      {conversations.length === 0 && (
+        <div className="cost-optimization-widget">
+          <CostOptimization 
+            conversationCount={1000}
+          />
+        </div>
+      )}
 
-            <Dashboard 
-              metrics={transformedMetrics}
-              isLoading={!metrics && conversations.length === 0}
-              dynamicData={dynamicData}
-            />
-            
-            {conversations.length === 0 && (
-              <div className="empty-state">
-                <h3>📤 No hay datos disponibles</h3>
-                <p>
-                  Sube un archivo Excel con conversaciones para ver el análisis completo
-                </p>
-                <button 
-                  className="upload-button"
-                  onClick={() => setActiveSection('upload')}
-                >
-                  Subir Archivo
-                </button>
-              </div>
-            )}
+      {/* Conversations Section - Visible cuando hay datos */}
+      {conversations.length > 0 && (
+        <div className="conversations-section">
+          <div className="section-header">
+            <h2>💬 Conversaciones Analizadas</h2>
+            <p>Detalle completo con análisis IA, resúmenes y sugerencias personalizadas</p>
           </div>
-        )}
 
-        {activeSection === 'conversations' && (
-          <div className="conversations-section">
-            <div className="section-header">
-              <h2>💬 Conversaciones Analizadas</h2>
-              <p>Detalle completo con análisis IA, resúmenes y sugerencias personalizadas</p>
-            </div>
+          <ConversationsTable 
+            conversations={conversations}
+            onViewConversation={handleViewConversation}
+          />
+        </div>
+      )}
 
-            <ConversationsTable 
-              conversations={conversations}
-              onViewConversation={handleViewConversation}
-            />
+      {/* Export Section - Visible cuando hay datos */}
+      {conversations.length > 0 && (
+        <div className="export-section">
+          <div className="section-header">
+            <h2>📋 Exportar Datos</h2>
+            <p>Genera reportes en PDF o Excel con los análisis realizados</p>
           </div>
-        )}
+          
+          <ExportPage />
+        </div>
+      )}
 
-        {activeSection === 'export' && (
-          <div className="export-section">
-            <div className="section-header">
-              <h2>📋 Exportar Datos</h2>
-              <p>Genera reportes en PDF o Excel con los análisis realizados</p>
-            </div>
-            
-            <ExportPage />
-          </div>
-        )}
-      </div>
+      {/* Empty State - Cuando no hay datos */}
+      {conversations.length === 0 && !isProcessing && (
+        <div className="empty-state">
+          <h3>📤 ¡Comienza analizando tus conversaciones!</h3>
+          <p>
+            Sube un archivo Excel o CSV con tus conversaciones de WhatsApp arriba
+            para ver análisis detallados con IA, métricas y insights avanzados.
+          </p>
+        </div>
+      )}
 
-      {/* Footer Stats */}
+      {/* Footer Stats - Visible cuando hay datos */}
       {conversations.length > 0 && (
         <div className="footer-stats">
           <div className="stats-container">
@@ -337,7 +345,7 @@ const LandingDashboard = () => {
 function App() {
   return (
     <div className="app">
-      <LandingDashboard />
+      <SinglePageDashboard />
       <Toaster
         position="top-right"
         toastOptions={{
