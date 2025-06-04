@@ -127,25 +127,32 @@ export class ExportService {
       conv.totalMessages.toString(),
       conv.startDate.toLocaleDateString('es-ES'),
       conv.assignedAgent || 'Sin asignar',
-      this.truncateText(conv.lastMessage, 30)
+      this.truncateText(conv.lastMessage, 25)
     ])
 
     autoTable(pdf, {
       startY: yPosition,
-      head: [['Cliente', 'Telefono', 'Estado', 'Mensajes', 'Fecha', 'Agente', 'Ultimo Mensaje']],
+      head: [['Cliente', 'Telefono', 'Estado', 'Msgs', 'Fecha', 'Agente', 'Ultimo Mensaje']],
       body: conversationsData,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [46, 204, 113] },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 20 },
-        3: { cellWidth: 15 },
-        4: { cellWidth: 20 },
-        5: { cellWidth: 25 },
-        6: { cellWidth: 40 }
+      styles: { 
+        fontSize: 7,
+        cellPadding: 3
       },
-      margin: { left: 20 }
+      headStyles: { 
+        fillColor: [46, 204, 113],
+        fontSize: 8
+      },
+      columnStyles: {
+        0: { cellWidth: 22 },  // Cliente
+        1: { cellWidth: 20 },  // Teléfono  
+        2: { cellWidth: 18 },  // Estado
+        3: { cellWidth: 12 },  // Mensajes
+        4: { cellWidth: 18 },  // Fecha
+        5: { cellWidth: 20 },  // Agente
+        6: { cellWidth: 35 }   // Último Mensaje
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto'
     })
 
     return (pdf as any).lastAutoTable.finalY + 20
@@ -162,27 +169,34 @@ export class ExportService {
     yPosition += 15
 
     const analysisData = analysisResults.map(result => [
-      result.conversationId.substring(0, 8) + '...',
+      result.conversationId.substring(0, 6) + '...',
       this.getSentimentLabelForPDF(result.sentiment.label),
       result.intent.primary.type,
       `${(result.confidence * 100).toFixed(0)}%`,
-      this.truncateText(result.summary, 40)
+      this.truncateText(result.summary, 35)
     ])
 
     autoTable(pdf, {
       startY: yPosition,
-      head: [['ID Conv.', 'Sentimiento', 'Intencion', 'Confianza', 'Resumen']],
+      head: [['ID Conv.', 'Sentimiento', 'Intencion', 'Conf.', 'Resumen']],
       body: analysisData,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [155, 89, 182] },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 30 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 70 }
+      styles: { 
+        fontSize: 7,
+        cellPadding: 3
       },
-      margin: { left: 20 }
+      headStyles: { 
+        fillColor: [155, 89, 182],
+        fontSize: 8
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },  // ID Conversación
+        1: { cellWidth: 22 },  // Sentimiento
+        2: { cellWidth: 25 },  // Intención
+        3: { cellWidth: 15 },  // Confianza
+        4: { cellWidth: 63 }   // Resumen
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto'
     })
 
     return (pdf as any).lastAutoTable.finalY + 20
