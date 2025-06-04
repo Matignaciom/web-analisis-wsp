@@ -88,12 +88,21 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const formatValue = (value: string | number, type: string): string => {
     switch (type) {
-      case 'percentage':
-        return `${value}%`
       case 'currency':
-        return `$${Number(value).toLocaleString()}`
+        const numValue = typeof value === 'number' ? value : parseFloat(String(value).replace(/[^0-9.-]/g, ''))
+        if (isNaN(numValue)) return '$0.00'
+        return new Intl.NumberFormat('es-MX', {
+          style: 'currency',
+          currency: 'USD',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }).format(numValue)
+      case 'percentage':
+        return `${Number(value)}%`
       case 'number':
-        return Number(value).toLocaleString()
+        const numberValue = typeof value === 'number' ? value : parseFloat(String(value))
+        if (isNaN(numberValue)) return '0'
+        return new Intl.NumberFormat('es-MX').format(numberValue)
       default:
         return String(value)
     }
@@ -114,7 +123,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       icon: <CheckCircle size={24} />,
       color: 'green' as const,
       trend: { value: 8.3, direction: 'up' as const },
-      subtitle: `${metrics.conversionRate?.toFixed(1) || '0'}% conversión`
+      subtitle: `${metrics.conversionRate?.toFixed(1) || '0'} conversión`
     },
     {
       title: "Abandonos",

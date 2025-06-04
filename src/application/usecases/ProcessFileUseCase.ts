@@ -193,17 +193,62 @@ export class ProcessFileUseCase {
   }
 
   private async analyzeConversationsAsync(conversationIds: string[]): Promise<void> {
+    console.log(`🤖 Iniciando análisis de IA para ${conversationIds.length} conversaciones...`)
+    
     // Análisis en background para no bloquear la UI
     for (const id of conversationIds) {
       try {
         const conversation = await this.conversationRepository.getById(id)
         if (conversation) {
-          await this.analysisService.analyzeConversation(conversation)
+          console.log(`🔍 Analizando conversación: ${conversation.customerName}`)
+          
+          // Generar análisis completo de IA
+          const [summary, suggestion, interest, salesPotential] = await Promise.all([
+            this.analysisService.generateConversationSummary(conversation),
+            this.analysisService.generateConversationSuggestion(conversation),
+            this.analysisService.generateInterest(conversation),
+            this.analysisService.generateSalesPotential(conversation)
+          ])
+          
+          // Actualizar conversación con los resultados de IA
+          const updatedConversation = {
+            ...conversation,
+            aiSummary: summary,
+            aiSuggestion: suggestion,
+            interest: interest,
+            salesPotential: salesPotential
+          }
+          
+          await this.conversationRepository.update(id, updatedConversation)
+          console.log(`✅ Análisis IA completado para: ${conversation.customerName}`)
+          
+          // Pausa breve para evitar sobrecarga de API
+          await new Promise(resolve => setTimeout(resolve, 500))
         }
       } catch (error) {
-        console.error(`Error analizando conversación ${id}:`, error)
+        console.error(`❌ Error analizando conversación ${id}:`, error)
+        
+        // En caso de error, actualizar con valores por defecto
+        try {
+          const conversation = await this.conversationRepository.getById(id)
+          if (conversation) {
+            const fallbackUpdate = {
+              ...conversation,
+              aiSummary: `Conversación con ${conversation.customerName} - ${conversation.status}`,
+              aiSuggestion: 'Realizar seguimiento personalizado según el contexto de la conversación',
+              interest: 'Información general',
+              salesPotential: conversation.status === 'completed' ? 'high' as const : 'medium' as const
+            }
+            await this.conversationRepository.update(id, fallbackUpdate)
+            console.log(`🔄 Análisis de respaldo aplicado para: ${conversation.customerName}`)
+          }
+        } catch (fallbackError) {
+          console.error(`❌ Error aplicando análisis de respaldo para ${id}:`, fallbackError)
+        }
       }
     }
+    
+    console.log(`🎉 Análisis de IA completado para todas las conversaciones`)
   }
 }
 

@@ -15,21 +15,90 @@ export class ExcelFileProcessor implements IFileProcessor {
   private readonly supportedFormats = ['.xlsx', '.xls', '.csv']
   private readonly maxFileSize = 25 * 1024 * 1024 // 25MB
   
-  // Mapeo de columnas esperadas (flexible para diferentes formatos)
+  // Mapeo de columnas esperadas (ultra-flexible para cualquier formato de Excel)
   private readonly columnMappings = {
-    customerName: ['cliente', 'customer_name', 'name', 'nombre', 'usuario'],
-    customerPhone: ['telefono', 'phone', 'numero', 'whatsapp', 'celular'],
-    startDate: ['fecha', 'date', 'fecha_inicio', 'start_date', 'timestamp'],
-    endDate: ['fecha_fin', 'end_date', 'fecha_final'],
-    status: ['estado', 'status', 'estado_conversacion'],
-    totalMessages: ['mensajes', 'messages', 'total_messages', 'cantidad_mensajes'],
-    lastMessage: ['ultimo_mensaje', 'last_message', 'mensaje_final'],
-    assignedAgent: ['agente', 'agent', 'vendedor', 'assigned_agent'],
-    source: ['origen', 'source', 'canal'],
-    responseTime: ['tiempo_respuesta', 'response_time', 'tiempo'],
-    satisfaction: ['satisfaccion', 'satisfaction', 'rating'],
-    purchaseValue: ['valor_compra', 'purchase_value', 'monto', 'total'],
-    conversionRate: ['conversion_rate', 'tasa_conversion']
+    customerName: [
+      'cliente', 'customer_name', 'name', 'nombre', 'usuario', 'user', 'customer',
+      'nom', 'client', 'person', 'persona', 'contact', 'contacto', 'lead',
+      'prospecto', 'buyer', 'comprador', 'cliente_nombre', 'full_name', 
+      'nombre_completo', 'first_name', 'last_name', 'apellido'
+    ],
+    customerPhone: [
+      'telefono', 'phone', 'numero', 'whatsapp', 'celular', 'mobile', 'tel', 
+      'phone_number', 'numero_telefono', 'cel', 'movil', 'contact_number',
+      'numero_contacto', 'whatsapp_number', 'telefono_celular', 'cell_phone',
+      'phone_mobile', 'numero_cel', 'contact_phone', 'telefono_contacto'
+    ],
+    startDate: [
+      'fecha', 'date', 'fecha_inicio', 'start_date', 'timestamp', 'dia', 'day',
+      'fecha_creacion', 'creation_date', 'fecha_registro', 'register_date',
+      'created_at', 'fecha_conversacion', 'conversation_date', 'inicio',
+      'fecha_contacto', 'contact_date', 'fecha_lead', 'lead_date'
+    ],
+    endDate: [
+      'fecha_fin', 'end_date', 'fecha_final', 'completed_date', 'fecha_cierre',
+      'close_date', 'finished_date', 'fecha_terminado', 'end_time'
+    ],
+    status: [
+      'estado', 'status', 'estado_conversacion', 'conversation_status',
+      'stage', 'etapa', 'fase', 'state', 'situacion', 'condition',
+      'lead_status', 'deal_status', 'pipeline_stage', 'funnel_stage'
+    ],
+    totalMessages: [
+      'mensajes', 'messages', 'total_messages', 'cantidad_mensajes',
+      'num_messages', 'message_count', 'total_msgs', 'cantidad_msgs',
+      'interactions', 'interacciones', 'chats', 'responses', 'respuestas'
+    ],
+    lastMessage: [
+      'ultimo_mensaje', 'last_message', 'mensaje_final', 'final_message',
+      'latest_message', 'recent_message', 'mensaje_reciente', 'last_msg',
+      'ultimo_msg', 'latest_msg', 'final_msg', 'mensaje_ultimo'
+    ],
+    assignedAgent: [
+      'agente', 'agent', 'vendedor', 'assigned_agent', 'seller', 'sales_agent',
+      'representative', 'representante', 'asesor', 'advisor', 'consultor',
+      'consultant', 'assigned_to', 'asignado_a', 'responsible', 'responsable',
+      'owner', 'propietario', 'sales_rep', 'account_manager'
+    ],
+    source: [
+      'origen', 'source', 'canal', 'channel', 'campaign', 'campaña',
+      'medium', 'medio', 'platform', 'plataforma', 'referrer', 'referencia',
+      'utm_source', 'traffic_source', 'lead_source', 'fuente'
+    ],
+    responseTime: [
+      'tiempo_respuesta', 'response_time', 'tiempo', 'time_to_respond',
+      'reply_time', 'tiempo_responder', 'response_delay', 'reaction_time',
+      'tiempo_reaccion', 'first_response_time', 'avg_response_time'
+    ],
+    satisfaction: [
+      'satisfaccion', 'satisfaction', 'rating', 'puntuacion', 'score',
+      'calificacion', 'feedback', 'review', 'opinion', 'customer_satisfaction',
+      'csat', 'nps', 'rating_score', 'satisfaction_score'
+    ],
+    purchaseValue: [
+      'valor_compra', 'purchase_value', 'monto', 'total', 'amount', 'value',
+      'deal_value', 'sale_amount', 'purchase_amount', 'order_value',
+      'ticket_size', 'revenue', 'ingresos', 'venta_total', 'precio_final'
+    ],
+    conversionRate: [
+      'conversion_rate', 'tasa_conversion', 'rate', 'tasa', 'percentage',
+      'porcentaje', 'success_rate', 'close_rate', 'win_rate'
+    ],
+    interest: [
+      'interes', 'interest', 'producto_interes', 'product_interest',
+      'item_interest', 'interested_in', 'product', 'producto', 'service',
+      'servicio', 'category', 'categoria', 'offering', 'oferta'
+    ],
+    salesPotential: [
+      'potencial_venta', 'sales_potential', 'potential', 'potencial',
+      'lead_score', 'score_lead', 'qualification', 'calificacion',
+      'priority', 'prioridad', 'quality', 'calidad', 'likelihood', 'probabilidad'
+    ],
+    notes: [
+      'notas', 'notes', 'comments', 'comentarios', 'observations',
+      'observaciones', 'remarks', 'additional_info', 'info_adicional',
+      'description', 'descripcion', 'details', 'detalles'
+    ]
   }
 
   getSupportedFormats(): string[] {
@@ -365,7 +434,13 @@ export class ExcelFileProcessor implements IFileProcessor {
       if (!customerName && row.length > 0) {
         for (let i = 0; i < Math.min(4, row.length); i++) {
           const value = this.getCellValue(row, i)
-          if (value && typeof value === 'string' && value.trim().length > 1 && !value.match(/^\d+$/)) {
+          if (value && typeof value === 'string' && value.trim().length > 1 && 
+              !value.match(/^\d+$/) && 
+              !this.looksLikeDate(value) && // Evitar fechas como nombres
+              !value.match(/^\d{4}-\d{2}-\d{2}/) && // Evitar formatos de fecha ISO
+              !value.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) && // Evitar dd/mm/yyyy
+              !value.match(/^\d{1,2}-\d{1,2}-\d{4}/) && // Evitar dd-mm-yyyy
+              !value.match(/^[\d\s\-\+\(\)]{8,}$/)) { // Evitar teléfonos
             customerName = value.trim()
             console.log(`🔧 Usando "${customerName}" como nombre del cliente (columna ${i})`)
             break
@@ -373,9 +448,9 @@ export class ExcelFileProcessor implements IFileProcessor {
         }
       }
       
-      // Si aún no tenemos nombre, generar uno basado en la fila
-      if (!customerName) {
-        customerName = `Cliente_${rowNumber}`
+      // Si aún no tenemos nombre, generar uno más descriptivo
+      if (!customerName || customerName.trim() === '') {
+        customerName = `Cliente Sin Nombre #${rowNumber}`
         console.log(`🔧 Generando nombre por defecto: "${customerName}"`)
       }
       
@@ -488,9 +563,9 @@ export class ExcelFileProcessor implements IFileProcessor {
       }
 
       // Obtener último mensaje
-      let lastMessage = 'Sin mensaje disponible'
+      let lastMessage = 'No se ha iniciado conversación'
       const lastMessageValue = this.getCellValue(row, columnMapping.lastMessage)
-      if (lastMessageValue && typeof lastMessageValue === 'string') {
+      if (lastMessageValue && typeof lastMessageValue === 'string' && lastMessageValue.trim().length > 0) {
         lastMessage = lastMessageValue.trim()
       } else {
         // Buscar cualquier columna con texto que pueda ser un mensaje

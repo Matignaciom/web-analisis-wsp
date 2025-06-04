@@ -282,4 +282,190 @@ Proporciona un análisis en este formato JSON exacto:
       `- ${conv.customerName}: ${conv.status} (${conv.totalMessages} msgs) - "${conv.lastMessage}"`
     ).join('\n')
   }
+
+  async generateConversationSummary(conversation: Conversation): Promise<string> {
+    try {
+      // Verificar si no hay mensajes suficientes
+      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      
+      if (hasNoMessages) {
+        return `No hay mensajes registrados para analizar. Conversación con ${conversation.customerName} está marcada como ${conversation.status === 'pending' ? 'pendiente' : conversation.status}.`
+      }
+      
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Eres un asistente especializado en resumir conversaciones de servicio al cliente. Genera resúmenes concisos y útiles.'
+          },
+          {
+            role: 'user',
+            content: `Resume esta conversación de WhatsApp de manera concisa:
+
+**Cliente:** ${conversation.customerName}
+**Teléfono:** ${conversation.customerPhone}
+**Estado:** ${conversation.status}
+**Total mensajes:** ${conversation.totalMessages}
+**Último mensaje:** ${conversation.lastMessage}
+**Agente:** ${conversation.assignedAgent || 'No asignado'}
+
+Genera un resumen de máximo 100 caracteres que capture la esencia de la conversación.`
+          }
+        ],
+        temperature: 0.4,
+        max_tokens: 150
+      })
+
+      return response.choices[0].message.content?.trim() || 'Resumen no disponible'
+    } catch (error) {
+      console.error('Error generando resumen:', error)
+      return `${conversation.status === 'completed' ? 'Cliente contactado' : 'Conversación'} con ${conversation.customerName}`
+    }
+  }
+
+  async generateConversationSuggestion(conversation: Conversation): Promise<string> {
+    try {
+      // Verificar si no hay mensajes suficientes
+      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      
+      if (hasNoMessages) {
+        return 'Enviar mensaje inicial personalizado para iniciar conversación'
+      }
+      
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Eres un consultor de ventas experto. Genera sugerencias específicas y accionables para seguimiento de clientes.'
+          },
+          {
+            role: 'user',
+            content: `Basándote en esta conversación, sugiere la mejor acción de seguimiento:
+
+**Cliente:** ${conversation.customerName}
+**Estado:** ${conversation.status}
+**Total mensajes:** ${conversation.totalMessages}
+**Último mensaje:** ${conversation.lastMessage}
+**Fecha:** ${conversation.startDate.toLocaleDateString()}
+
+Genera UNA sugerencia específica de máximo 120 caracteres para el próximo contacto o acción.`
+          }
+        ],
+        temperature: 0.5,
+        max_tokens: 200
+      })
+
+      return response.choices[0].message.content?.trim() || 'Realizar seguimiento personalizado'
+    } catch (error) {
+      console.error('Error generando sugerencia:', error)
+      
+      // Sugerencias de respaldo basadas en el estado
+      switch (conversation.status) {
+        case 'completed':
+          return 'Solicitar feedback y ofertas complementarias'
+        case 'abandoned':
+          return 'Contactar con oferta especial o descuento'
+        case 'pending':
+          return 'Responder rápidamente y agendar llamada'
+        case 'active':
+          return 'Mantener seguimiento activo y cerrar venta'
+        default:
+          return 'Realizar seguimiento personalizado según contexto'
+      }
+    }
+  }
+
+  async generateInterest(conversation: Conversation): Promise<string> {
+    try {
+      // Verificar si no hay mensajes suficientes
+      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      
+      if (hasNoMessages) {
+        return 'No identificado (falta de mensajes para evaluar intención)'
+      }
+      
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Identifica el principal interés o necesidad del cliente basándote en la conversación.'
+          },
+          {
+            role: 'user',
+            content: `Identifica el interés principal del cliente:
+
+**Último mensaje:** ${conversation.lastMessage}
+**Total mensajes:** ${conversation.totalMessages}
+**Estado:** ${conversation.status}
+
+Responde con UNA palabra o frase corta (máximo 30 caracteres) que describa el interés principal.`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 50
+      })
+
+      return response.choices[0].message.content?.trim() || 'Información general'
+    } catch (error) {
+      console.error('Error generando interés:', error)
+      
+      // Determinar interés basado en palabras clave del último mensaje
+      const message = conversation.lastMessage.toLowerCase()
+      if (message.includes('precio') || message.includes('costo') || message.includes('cuanto')) {
+        return 'Consulta de precios'
+      } else if (message.includes('stock') || message.includes('disponible') || message.includes('tienen')) {
+        return 'Verificación de stock'
+      } else if (message.includes('comprar') || message.includes('pedir') || message.includes('quiero')) {
+        return 'Intención de compra'
+      } else if (message.includes('problema') || message.includes('ayuda') || message.includes('soporte')) {
+        return 'Soporte técnico'
+      } else {
+        return 'Información general'
+      }
+    }
+  }
+
+  async generateSalesPotential(conversation: Conversation): Promise<'low' | 'medium' | 'high'> {
+    try {
+      const response = await this.openai.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: 'Evalúa el potencial de venta basándote en la conversación. Responde solo con: low, medium, o high'
+          },
+          {
+            role: 'user',
+            content: `Evalúa el potencial de venta:
+
+**Estado:** ${conversation.status}
+**Total mensajes:** ${conversation.totalMessages}
+**Último mensaje:** ${conversation.lastMessage}
+
+¿Cuál es el potencial de venta? Responde solo con: low, medium, o high`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 10
+      })
+
+      const result = response.choices[0].message.content?.trim().toLowerCase()
+      if (result === 'high' || result === 'medium' || result === 'low') {
+        return result as 'low' | 'medium' | 'high'
+      }
+      return 'medium'
+    } catch (error) {
+      console.error('Error evaluando potencial de venta:', error)
+      
+      // Lógica de respaldo
+      if (conversation.status === 'completed') return 'high'
+      if (conversation.status === 'abandoned') return 'low'
+      if (conversation.totalMessages > 10) return 'high'
+      if (conversation.totalMessages > 5) return 'medium'
+      return 'low'
+    }
+  }
 }

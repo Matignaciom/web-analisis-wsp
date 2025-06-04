@@ -1,0 +1,303 @@
+.tableContainer {
+  background: white;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  margin: 20px 0;
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.table th {
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+  padding: 16px 12px;
+  font-weight: 600;
+  color: #374151;
+  text-align: left;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: top;
+}
+
+.tableRow:hover {
+  background: #f8fafc;
+}
+
+/* Customer Cell */
+.customerCell {
+  min-width: 150px;
+}
+
+.customerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customerName {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.messageCount {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+/* Phone Cell */
+.phoneCell {
+  min-width: 120px;
+}
+
+/* Copyable Field Component */
+.copyableField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 200px;
+}
+
+.fieldText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #475569;
+}
+
+.copyButton {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 28px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copyButton:hover {
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+}
+
+.copyButton.copied {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #16a34a;
+}
+
+/* Interest Cell */
+.interestCell {
+  min-width: 120px;
+}
+
+/* Potential Cell */
+.potentialCell {
+  min-width: 80px;
+}
+
+/* Status and Potential Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #86efac;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #d97706;
+  border: 1px solid #fbbf24;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+.badge-neutral {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+/* AI Summary and Suggestion Cells */
+.aiSummaryCell,
+.aiSuggestionCell {
+  min-width: 180px;
+  max-width: 250px;
+}
+
+.generating {
+  color: #64748b;
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+/* Agent Cell */
+.agentCell {
+  min-width: 100px;
+}
+
+/* Actions Cell */
+.actionsCell {
+  min-width: 80px;
+}
+
+.viewButton {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.viewButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* No Data */
+.noData {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.8rem;
+}
+
+/* Table Footer */
+.tableFooter {
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-top: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.resultsCount {
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Empty State */
+.emptyState {
+  text-align: center;
+  padding: 60px 40px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+
+.emptyState h3 {
+  font-size: 1.5rem;
+  color: #64748b;
+  margin-bottom: 12px;
+}
+
+.emptyState p {
+  color: #94a3b8;
+  font-size: 1.1rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .table {
+    font-size: 0.8rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 10px 8px;
+  }
+  
+  .copyableField {
+    max-width: 150px;
+  }
+  
+  .aiSummaryCell,
+  .aiSuggestionCell {
+    min-width: 140px;
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 768px) {
+  .tableWrapper {
+    overflow-x: scroll;
+  }
+  
+  .table {
+    min-width: 1000px;
+    font-size: 0.75rem;
+  }
+  
+  .table th,
+  .table td {
+    padding: 8px 6px;
+  }
+  
+  .copyableField {
+    max-width: 120px;
+  }
+  
+  .customerCell,
+  .phoneCell,
+  .interestCell {
+    min-width: 100px;
+  }
+  
+  .aiSummaryCell,
+  .aiSuggestionCell {
+    min-width: 120px;
+    max-width: 150px;
+  }
+}
+
+@media (max-width: 480px) {
+  .tableContainer {
+    margin: 15px 0;
+    border-radius: 12px;
+  }
+  
+  .table {
+    min-width: 900px;
+  }
+  
+  .emptyState {
+    padding: 40px 20px;
+  }
+} 

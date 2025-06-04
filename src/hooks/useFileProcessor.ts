@@ -78,6 +78,11 @@ export const useFileProcessor = (): FileProcessorHookResult => {
 
     console.log('📂 Iniciando procesamiento de archivo:', file.name || 'Sin nombre')
     
+    // LIMPIAR DATOS PREVIOS antes de procesar nuevo archivo
+    console.log('🧹 Limpiando datos de archivos anteriores...')
+    setConversations([]) // Limpiar conversaciones previas
+    setDashboardMetrics(null) // Limpiar métricas previas
+    
     // Crear objeto de detalles de archivo de forma segura
     const fileDetails: any = {
       name: file.name || 'archivo_sin_nombre',
@@ -120,6 +125,10 @@ export const useFileProcessor = (): FileProcessorHookResult => {
         conversationRepository 
       } = initializeServices()
 
+      // IMPORTANTE: Limpiar repositorio para nuevos archivos
+      console.log('🗑️ Limpiando repositorio anterior...')
+      await conversationRepository.clear()
+
       // Mostrar toast de progreso
       toastId = toast.loading(`Procesando ${fileDetails.name}...`, {
         duration: Infinity
@@ -152,6 +161,11 @@ export const useFileProcessor = (): FileProcessorHookResult => {
       console.log('📈 Obteniendo conversaciones actualizadas...')
       const conversations = await conversationRepository.getAll()
       setConversations(conversations)
+
+      // Guardar referencia del repositorio para el hook de actualización
+      if (typeof window !== 'undefined') {
+        (window as any).__conversationRepository = conversationRepository
+      }
 
       // Actualizar métricas del dashboard
       setProgress(85)

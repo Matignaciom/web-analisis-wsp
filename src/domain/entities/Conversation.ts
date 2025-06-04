@@ -10,6 +10,10 @@ export interface Conversation {
   assignedAgent?: string
   tags: string[]
   metadata: ConversationMetadata
+  aiSummary?: string
+  aiSuggestion?: string
+  interest?: string
+  salesPotential?: 'low' | 'medium' | 'high'
 }
 
 export enum ConversationStatus {

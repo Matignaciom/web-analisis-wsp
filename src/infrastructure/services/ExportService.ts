@@ -21,6 +21,15 @@ export interface ExportOptions {
 
 export class ExportService {
   
+  private formatCurrency(value: number): string {
+    return new Intl.NumberFormat('es-MX', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value)
+  }
+
   async exportToPDF(data: ExportData, options: ExportOptions = {}): Promise<Blob> {
     const pdf = new jsPDF()
     let yPosition = 20
@@ -227,7 +236,7 @@ export class ExportService {
       'Último Mensaje': conv.lastMessage,
       'Tiempo Respuesta (min)': conv.metadata.responseTime,
       'Satisfacción': conv.metadata.satisfaction || 'N/A',
-      'Valor Compra': conv.metadata.totalPurchaseValue || 'N/A',
+      'Valor Compra': conv.metadata.totalPurchaseValue ? this.formatCurrency(conv.metadata.totalPurchaseValue) : 'N/A',
       'Fuente': conv.metadata.source,
       'Etiquetas': conv.tags.join(', ')
     }))

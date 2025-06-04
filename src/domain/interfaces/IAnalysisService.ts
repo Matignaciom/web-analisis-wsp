@@ -4,6 +4,10 @@ export interface IAnalysisService {
   analyzeConversation(conversation: Conversation): Promise<AnalysisResult>
   analyzeBatch(conversations: Conversation[]): Promise<AnalysisResult[]>
   generateSummary(conversations: Conversation[]): Promise<string>
+  generateConversationSummary(conversation: Conversation): Promise<string>
+  generateConversationSuggestion(conversation: Conversation): Promise<string>
+  generateInterest(conversation: Conversation): Promise<string>
+  generateSalesPotential(conversation: Conversation): Promise<'low' | 'medium' | 'high'>
 }
 
 export interface IFileProcessingService {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { SupabaseStorageService, type UploadResult } from '../../infrastructure/services/SupabaseStorageService'
 
 export interface UploadState {
@@ -27,6 +27,7 @@ export const useFileUpload = (): UseFileUploadReturn => {
     error: null
   })
 
+  const progressIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined)
   const storageService = new SupabaseStorageService()
 
   const uploadFile = useCallback(async (file: File): Promise<UploadResult> => {
@@ -38,18 +39,26 @@ export const useFileUpload = (): UseFileUploadReturn => {
     }))
 
     try {
-      // Simular progreso de subida (Supabase no proporciona progreso real)
-      const progressInterval = setInterval(() => {
+      // Progreso más optimizado - menos frecuente y más fluido
+      let currentProgress = 0
+      progressIntervalRef.current = setInterval(() => {
+        currentProgress = Math.min(currentProgress + 8, 85) // Incremento más grande, menos frecuente
         setUploadState(prev => ({
           ...prev,
-          uploadProgress: Math.min(prev.uploadProgress + 10, 90)
+          uploadProgress: currentProgress
         }))
-      }, 100)
+      }, 200) // 200ms en lugar de 100ms para menos carga
 
       const result = await storageService.uploadFile(file)
-      clearInterval(progressInterval)
+      
+      // Limpiar intervalo inmediatamente
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = undefined
+      }
 
       if (result.success) {
+        // Completar progreso de una vez
         setUploadState(prev => ({
           ...prev,
           isUploading: false,
@@ -73,6 +82,12 @@ export const useFileUpload = (): UseFileUploadReturn => {
       return result
 
     } catch (error) {
+      // Asegurar limpieza del intervalo en caso de error
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current)
+        progressIntervalRef.current = undefined
+      }
+
       setUploadState(prev => ({
         ...prev,
         isUploading: false,
@@ -88,6 +103,12 @@ export const useFileUpload = (): UseFileUploadReturn => {
   }, [])
 
   const resetUpload = useCallback(() => {
+    // Limpiar intervalo si está activo
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current)
+      progressIntervalRef.current = undefined
+    }
+
     setUploadState({
       isUploading: false,
       uploadProgress: 0,

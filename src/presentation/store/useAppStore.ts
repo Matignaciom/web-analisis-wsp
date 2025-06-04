@@ -31,7 +31,7 @@ interface AppActions {
   setError: (error: string | null) => void
   
   // Dashboard Actions
-  setDashboardMetrics: (metrics: DashboardMetrics) => void
+  setDashboardMetrics: (metrics: DashboardMetrics | null) => void
   setLoadingMetrics: (loading: boolean) => void
   
   // Conversations Actions
