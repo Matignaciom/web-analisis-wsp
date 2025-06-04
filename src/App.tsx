@@ -5,6 +5,9 @@ import { FileUploader } from '@/presentation/components/FileUploader'
 import { ConversationsTable } from '@/presentation/components/ConversationsTable'
 import ConversationModal from '@/presentation/components/ConversationModal'
 import CostOptimization from '@/presentation/components/CostOptimization'
+import AIInsightsPanel from '@/presentation/components/AIInsightsPanel'
+import DetailedAnalysisTable from '@/presentation/components/DetailedAnalysisTable'
+import SampleDataButton from '@/presentation/components/SampleDataButton/SampleDataButton'
 import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useConversationUpdater } from '@/hooks/useConversationUpdater'
 import { useConversations } from '@/presentation/store/useAppStore'
@@ -15,6 +18,7 @@ import './App.css'
 const SinglePageDashboard = () => {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedAIFilters, setSelectedAIFilters] = useState<string[]>([])
   const { processFile, isProcessing, progress, error, resetState } = useFileProcessor()
   const conversations = useConversations()
   
@@ -52,6 +56,22 @@ const SinglePageDashboard = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedConversation(null)
+  }
+
+  const handleAIFilterSelect = (filterId: string) => {
+    setSelectedAIFilters(prev => 
+      prev.includes(filterId)
+        ? prev.filter(id => id !== filterId)
+        : [...prev, filterId]
+    )
+  }
+
+  const handleClearAIFilters = () => {
+    setSelectedAIFilters([])
+  }
+
+  const handleRemoveAIFilter = (filterId: string) => {
+    setSelectedAIFilters(prev => prev.filter(id => id !== filterId))
   }
 
   return (
@@ -136,6 +156,25 @@ const SinglePageDashboard = () => {
             con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
           </div>
         </div>
+
+        {/* Botón de datos de muestra */}
+        <div style={{ textAlign: 'center', margin: '24px 0' }}>
+          <div style={{ 
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
+            padding: '20px', 
+            borderRadius: '12px',
+            border: '2px dashed #cbd5e1',
+            marginBottom: '16px'
+          }}>
+            <h4 style={{ margin: '0 0 8px 0', color: '#475569' }}>
+              🚀 ¿Quieres probar inmediatamente?
+            </h4>
+            <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '14px' }}>
+              Carga datos de muestra para ver todas las funcionalidades en acción
+            </p>
+            <SampleDataButton />
+          </div>
+        </div>
       </div>
 
       {/* Dashboard Section - Visible cuando hay datos */}
@@ -202,19 +241,24 @@ const SinglePageDashboard = () => {
         </div>
       )}
 
-      {/* Conversations Section - Visible cuando hay datos */}
+      {/* AI Insights Panel - Visible cuando hay datos */}
       {conversations.length > 0 && (
-        <div className="conversations-section">
-          <div className="section-header">
-            <h2>💬 Conversaciones Analizadas</h2>
-            <p>Detalle completo con análisis IA, resúmenes y sugerencias personalizadas</p>
-          </div>
+        <AIInsightsPanel
+          conversations={conversations}
+          selectedFilters={selectedAIFilters}
+          onFilterSelect={handleAIFilterSelect}
+          onClearFilters={handleClearAIFilters}
+        />
+      )}
 
-          <ConversationsTable 
-            conversations={conversations}
-            onViewConversation={handleViewConversation}
-          />
-        </div>
+      {/* Detailed Analysis Table - Reemplaza ConversationsTable */}
+      {conversations.length > 0 && (
+        <DetailedAnalysisTable
+          conversations={conversations}
+          selectedAIFilters={selectedAIFilters}
+          onRemoveAIFilter={handleRemoveAIFilter}
+          onViewConversation={handleViewConversation}
+        />
       )}
 
       {/* Export Section - Visible cuando hay datos */}

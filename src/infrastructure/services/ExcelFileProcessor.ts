@@ -647,28 +647,46 @@ export class ExcelFileProcessor implements IFileProcessor {
     try {
       console.log(`🔍 Analizando fila ${rowNumber}:`, row)
       
+      // Función auxiliar para convertir valores a string de forma segura
+      const safeStringConvert = (value: any): string => {
+        if (value === null || value === undefined) return ''
+        if (typeof value === 'string') return value
+        if (typeof value === 'number') return String(value)
+        if (typeof value === 'boolean') return String(value)
+        if (value instanceof Date) return value.toISOString()
+        return String(value)
+      }
+      
       // Obtener nombre del cliente (requerido)
       let customerName = this.getCellValue(row, columnMapping.customerName)
+      
+      // Convertir a string de forma segura y validar
+      if (customerName !== null && customerName !== undefined) {
+        customerName = safeStringConvert(customerName).trim()
+      }
       
       // Si no tenemos nombre mapeado, buscar en las primeras columnas cualquier texto válido
       if (!customerName && row.length > 0) {
         for (let i = 0; i < Math.min(4, row.length); i++) {
           const value = this.getCellValue(row, i)
-          if (value && typeof value === 'string' && value.trim().length > 1 && 
-              !value.match(/^\d+$/) && 
-              !this.looksLikeDate(value) && // Evitar fechas como nombres
-              !value.match(/^\d{4}-\d{2}-\d{2}/) && // Evitar formatos de fecha ISO
-              !value.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) && // Evitar dd/mm/yyyy
-              !value.match(/^\d{1,2}-\d{1,2}-\d{4}/) && // Evitar dd-mm-yyyy
-              !value.match(/^[\d\s\-\+\(\)]{8,}$/)) { // Evitar teléfonos
-            customerName = value.trim()
-            console.log(`🔧 Usando "${customerName}" como nombre del cliente (columna ${i})`)
-            break
+          if (value && value !== null && value !== undefined) {
+            const stringValue = safeStringConvert(value).trim()
+            if (stringValue.length > 1 && 
+                !stringValue.match(/^\d+$/) && 
+                !this.looksLikeDate(value) && // Evitar fechas como nombres
+                !stringValue.match(/^\d{4}-\d{2}-\d{2}/) && // Evitar formatos de fecha ISO
+                !stringValue.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) && // Evitar dd/mm/yyyy
+                !stringValue.match(/^\d{1,2}-\d{1,2}-\d{4}/) && // Evitar dd-mm-yyyy
+                !stringValue.match(/^[\d\s\-\+\(\)]{8,}$/)) { // Evitar teléfonos
+              customerName = stringValue
+              console.log(`🔧 Usando "${customerName}" como nombre del cliente (columna ${i})`)
+              break
+            }
           }
         }
       }
       
-      // Si aún no tenemos nombre, generar uno más descriptivo
+      // Si aún no tenemos nombre válido, generar uno más descriptivo
       if (!customerName || customerName.trim() === '') {
         customerName = `Cliente Sin Nombre #${rowNumber}`
         console.log(`🔧 Generando nombre por defecto: "${customerName}"`)
@@ -677,21 +695,27 @@ export class ExcelFileProcessor implements IFileProcessor {
       // Obtener teléfono del cliente (requerido)
       let customerPhone = this.getCellValue(row, columnMapping.customerPhone)
       
+      // Convertir a string de forma segura
+      if (customerPhone !== null && customerPhone !== undefined) {
+        customerPhone = safeStringConvert(customerPhone)
+      }
+      
       // Si no tenemos teléfono mapeado, buscar cualquier valor que parezca un número
       if (!customerPhone && row.length > 0) {
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
-          if (value && (
-            typeof value === 'number' || 
-            (typeof value === 'string' && (
-              value.match(/[\d+()-\s]{8,}/) || // Números con al menos 8 dígitos
-              value.match(/^\+?[\d\s()-]{10,}$/) || // Formato teléfono
-              value.match(/^\d{10,}$/) // Solo números largos
-            ))
-          )) {
-            customerPhone = value
-            console.log(`🔧 Usando "${customerPhone}" como teléfono (columna ${i})`)
-            break
+          if (value && value !== null && value !== undefined) {
+            const stringValue = safeStringConvert(value)
+            if (typeof value === 'number' || 
+                (stringValue && (
+                  stringValue.match(/[\d+()-\s]{8,}/) || // Números con al menos 8 dígitos
+                  stringValue.match(/^\+?[\d\s()-]{10,}$/) || // Formato teléfono
+                  stringValue.match(/^\d{10,}$/) // Solo números largos
+                ))) {
+              customerPhone = stringValue
+              console.log(`🔧 Usando "${customerPhone}" como teléfono (columna ${i})`)
+              break
+            }
           }
         }
       }
@@ -785,17 +809,26 @@ export class ExcelFileProcessor implements IFileProcessor {
       // Obtener último mensaje
       let lastMessage = 'No se ha iniciado conversación'
       const lastMessageValue = this.getCellValue(row, columnMapping.lastMessage)
-      if (lastMessageValue && typeof lastMessageValue === 'string' && lastMessageValue.trim().length > 0) {
-        lastMessage = lastMessageValue.trim()
+      
+      if (lastMessageValue && lastMessageValue !== null && lastMessageValue !== undefined) {
+        const safeMessage = safeStringConvert(lastMessageValue).trim()
+        if (safeMessage.length > 0) {
+          lastMessage = safeMessage
+        }
       } else {
         // Buscar cualquier columna con texto que pueda ser un mensaje
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
-          if (value && typeof value === 'string' && value.length > 10 && 
-              value !== customerName && !this.looksLikeDate(value) && !value.match(/^\d+$/)) {
-            lastMessage = value.trim()
-            console.log(`🔧 Último mensaje encontrado en columna ${i}: "${lastMessage.substring(0, 50)}..."`)
-            break
+          if (value && value !== null && value !== undefined) {
+            const stringValue = safeStringConvert(value)
+            if (stringValue.length > 10 && 
+                stringValue !== customerName && 
+                !this.looksLikeDate(value) && 
+                !stringValue.match(/^\d+$/)) {
+              lastMessage = stringValue.trim()
+              console.log(`🔧 Último mensaje encontrado en columna ${i}: "${lastMessage.substring(0, 50)}..."`)
+              break
+            }
           }
         }
       }
@@ -803,8 +836,11 @@ export class ExcelFileProcessor implements IFileProcessor {
       // Obtener agente asignado
       let assignedAgent: string | undefined
       const agentValue = this.getCellValue(row, columnMapping.assignedAgent)
-      if (agentValue && typeof agentValue === 'string') {
-        assignedAgent = agentValue.trim()
+      if (agentValue && agentValue !== null && agentValue !== undefined) {
+        const safeAgent = safeStringConvert(agentValue).trim()
+        if (safeAgent.length > 0) {
+          assignedAgent = safeAgent
+        }
       }
 
       // Metadatos flexibles
@@ -837,13 +873,13 @@ export class ExcelFileProcessor implements IFileProcessor {
 
       const conversation: Conversation = {
         id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        customerName: String(customerName).trim(),
-        customerPhone: this.formatPhoneNumber(String(customerPhone)),
+        customerName: safeStringConvert(customerName).trim(),
+        customerPhone: this.formatPhoneNumber(safeStringConvert(customerPhone)),
         startDate,
         endDate: undefined, // Se puede agregar lógica para fecha fin si es necesario
         status,
         totalMessages,
-        lastMessage: String(lastMessage).trim(),
+        lastMessage: safeStringConvert(lastMessage).trim(),
         assignedAgent,
         tags: [], // Se pueden agregar tags basados en análisis
         metadata
