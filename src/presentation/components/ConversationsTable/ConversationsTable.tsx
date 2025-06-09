@@ -59,14 +59,20 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
   const CopyableField: React.FC<{ 
     text: string, 
     fieldId: string, 
-    maxLength?: number 
-  }> = ({ text, fieldId, maxLength = 50 }) => {
-    const displayText = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text
+    maxLength?: number,
+    showFullText?: boolean
+  }> = ({ text, fieldId, maxLength = 50, showFullText = false }) => {
+    const displayText = showFullText || text.length <= maxLength ? text : `${text.substring(0, maxLength)}...`
     const isCopied = copiedField === fieldId
     
     return (
       <div className={styles.copyableField}>
-        <span className={styles.fieldText} title={text}>
+        <span className={styles.fieldText} title={text} style={{
+          whiteSpace: showFullText ? 'normal' : 'nowrap',
+          wordWrap: showFullText ? 'break-word' : 'normal',
+          overflow: showFullText ? 'visible' : 'hidden',
+          textOverflow: showFullText ? 'unset' : 'ellipsis'
+        }}>
           {displayText}
         </span>
         <button
@@ -91,17 +97,29 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
 
   return (
     <div className={styles.tableContainer}>
+      <div style={{
+        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+        color: 'white',
+        padding: '12px 20px',
+        borderRadius: '12px 12px 0 0',
+        textAlign: 'center',
+        fontSize: '14px',
+        fontWeight: '600'
+      }}>
+        📊 ANÁLISIS INTELIGENTE DE CONVERSACIONES • 📋 TODOS LOS TEXTOS COPIABLES
+      </div>
+      
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
           <thead>
             <tr>
               <th>Cliente</th>
               <th>Número</th>
-              <th>Interés</th>
-              <th>Potencial</th>
+              <th>🤖 Interés (IA)</th>
+              <th>🎯 Potencial (IA)</th>
               <th>Estado</th>
-              <th>Resumen IA</th>
-              <th>Sugerencia IA</th>
+              <th>📝 Resumen IA (Copiable)</th>
+              <th>💡 Sugerencia IA (Copiable)</th>
               <th>Agente</th>
               <th>Acciones</th>
             </tr>
@@ -122,24 +140,54 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
                   <CopyableField 
                     text={conv.customerPhone} 
                     fieldId={`phone-${conv.id}`}
-                    maxLength={15}
+                    showFullText={true}
                   />
                 </td>
                 
                 <td className={styles.interestCell}>
                   {conv.interest ? (
-                    <CopyableField 
-                      text={conv.interest} 
-                      fieldId={`interest-${conv.id}`}
-                      maxLength={30}
-                    />
+                    <div style={{ position: 'relative' }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-8px',
+                        right: '-8px',
+                        background: '#10b981',
+                        color: 'white',
+                        fontSize: '10px',
+                        padding: '2px 4px',
+                        borderRadius: '4px',
+                        zIndex: 1
+                      }}>
+                        IA
+                      </div>
+                      <CopyableField 
+                        text={conv.interest} 
+                        fieldId={`interest-${conv.id}`}
+                        showFullText={true}
+                      />
+                    </div>
                   ) : (
-                    <span className={styles.noData}>Sin definir</span>
+                    <span className={styles.noData}>🤖 Analizando...</span>
                   )}
                 </td>
                 
                 <td className={styles.potentialCell}>
-                  {getSalesPotentialBadge(conv.salesPotential)}
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-8px',
+                      right: '-8px',
+                      background: '#f59e0b',
+                      color: 'white',
+                      fontSize: '10px',
+                      padding: '2px 4px',
+                      borderRadius: '4px',
+                      zIndex: 1
+                    }}>
+                      IA
+                    </div>
+                    {getSalesPotentialBadge(conv.salesPotential)}
+                  </div>
                 </td>
                 
                 <td className={styles.statusCell}>
@@ -148,28 +196,80 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
                 
                 <td className={styles.aiSummaryCell}>
                   {conv.aiSummary ? (
-                    <CopyableField 
-                      text={conv.aiSummary} 
-                      fieldId={`summary-${conv.id}`}
-                      maxLength={60}
-                    />
+                    <div style={{
+                      background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)',
+                      border: '1px solid #10b981',
+                      borderRadius: '8px',
+                      padding: '8px',
+                      position: 'relative'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        left: '8px',
+                        background: '#10b981',
+                        color: 'white',
+                        fontSize: '9px',
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        fontWeight: 'bold'
+                      }}>
+                        📝 RESUMEN
+                      </div>
+                      <CopyableField 
+                        text={conv.aiSummary} 
+                        fieldId={`summary-${conv.id}`}
+                        showFullText={true}
+                      />
+                    </div>
                   ) : (
-                    <span className={styles.generating}>
-                      🤖 Generando...
+                    <span className={styles.generating} style={{
+                      background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #f59e0b'
+                    }}>
+                      🤖 IA Generando...
                     </span>
                   )}
                 </td>
                 
                 <td className={styles.aiSuggestionCell}>
                   {conv.aiSuggestion ? (
-                    <CopyableField 
-                      text={conv.aiSuggestion} 
-                      fieldId={`suggestion-${conv.id}`}
-                      maxLength={60}
-                    />
+                    <div style={{
+                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                      border: '1px solid #3b82f6',
+                      borderRadius: '8px',
+                      padding: '8px',
+                      position: 'relative'
+                    }}>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-6px',
+                        left: '8px',
+                        background: '#3b82f6',
+                        color: 'white',
+                        fontSize: '9px',
+                        padding: '2px 6px',
+                        borderRadius: '10px',
+                        fontWeight: 'bold'
+                      }}>
+                        💡 SUGERENCIA
+                      </div>
+                      <CopyableField 
+                        text={conv.aiSuggestion} 
+                        fieldId={`suggestion-${conv.id}`}
+                        showFullText={true}
+                      />
+                    </div>
                   ) : (
-                    <span className={styles.generating}>
-                      💡 Analizando...
+                    <span className={styles.generating} style={{
+                      background: 'linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%)',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
+                      border: '1px solid #f59e0b'
+                    }}>
+                      💡 IA Analizando...
                     </span>
                   )}
                 </td>
@@ -184,9 +284,9 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
                   <button
                     className={styles.viewButton}
                     onClick={() => onViewConversation?.(conv)}
-                    title="Ver conversación completa"
+                    title="Ver análisis completo generado por IA"
                   >
-                    👁️ Ver
+                    👁️ Ver IA
                   </button>
                 </td>
               </tr>
@@ -197,7 +297,7 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
       
       <div className={styles.tableFooter}>
         <span className={styles.resultsCount}>
-          {conversations.length} conversación{conversations.length !== 1 ? 'es' : ''} encontrada{conversations.length !== 1 ? 's' : ''}
+          📊 {conversations.length} conversación{conversations.length !== 1 ? 'es' : ''} analizada{conversations.length !== 1 ? 's' : ''} con análisis inteligente
         </span>
       </div>
     </div>

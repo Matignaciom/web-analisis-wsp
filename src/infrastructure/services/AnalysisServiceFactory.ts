@@ -1,7 +1,7 @@
 import { OpenAIAnalysisService } from './OpenAIAnalysisService'
 import { OptimizedAnalysisService } from './OptimizedAnalysisService'
-import { config } from '@/config/environment'
-import type { IAnalysisService } from '@/domain/entities'
+import { config } from '../../config/environment'
+import type { IAnalysisService } from '../../domain/interfaces/IAnalysisService'
 
 export class AnalysisServiceFactory {
   private static instance: IAnalysisService | null = null

@@ -146,11 +146,72 @@
   font-style: italic;
 }
 
+.aiContentBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.expandedAiText {
+  flex: 1;
+  margin: 0;
+  color: #374151;
+  line-height: 1.6;
+  font-size: 14px;
+  padding: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: none;
+}
+
+.copyIconButton {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.copyIconButton:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+}
+
+.copyIconButton:active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  transform: translateY(0);
+}
+
 .messageBox {
   background: #f3f4f6;
   padding: 20px;
   border-radius: 12px;
   border-left: 4px solid #10b981;
+}
+
+.messageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.messageInfo {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .messageContent {
@@ -307,5 +368,28 @@
 
   .aiItem {
     padding: 12px;
+  }
+  
+  .aiContentBox {
+    flex-direction: column;
+    gap: 8px;
+    align-items: stretch;
+  }
+  
+  .expandedAiText {
+    font-size: 13px;
+    padding: 10px;
+  }
+  
+  .copyIconButton {
+    align-self: flex-end;
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  
+  .messageHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
 } 

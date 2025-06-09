@@ -244,19 +244,19 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
                 </button>
               </div>
             ))}
-            {selectedFilters.length > 1 && (
+            {selectedFilters.length > 0 && (
               <button
                 className={styles.clearAllFilters}
                 onClick={onClearFilters}
-                title="Limpiar todos los filtros"
+                title="Limpiar filtro"
               >
-                Limpiar filtros
+                Limpiar filtro
               </button>
             )}
           </>
         ) : (
           <div className={styles.emptyFilters}>
-            Haz clic en las tarjetas para filtrar conversaciones por tipo de sugerencia
+            Haz clic en una tarjeta para filtrar conversaciones por tipo de sugerencia
           </div>
         )}
       </div>

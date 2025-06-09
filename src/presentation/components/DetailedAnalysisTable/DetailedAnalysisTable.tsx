@@ -144,9 +144,12 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
   const CopyableField: React.FC<{ 
     text: string, 
     fieldId: string, 
-    maxLength?: number 
-  }> = ({ text, fieldId, maxLength = 50 }) => {
-    const displayText = text.length > maxLength ? `${text.substring(0, maxLength)}...` : text
+    maxLength?: number,
+    showFullText?: boolean
+  }> = ({ text, fieldId, maxLength = 50, showFullText = false }) => {
+    const displayText = showFullText || text.length <= maxLength 
+      ? text 
+      : `${text.substring(0, maxLength)}...`
     const isCopied = copiedField === fieldId
     
     return (
@@ -238,11 +241,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>NÚMERO</th>
-                <th>INTERÉS</th>
-                <th>VENTA</th>
-                <th>RESUMEN IA</th>
-                <th>SUGERENCIA IA</th>
+                <th>CLIENTE</th>
+                <th>INTERÉS DETECTADO</th>
+                <th>POTENCIAL VENTA</th>
+                <th>📝 RESUMEN COMPLETO IA</th>
+                <th>🎯 SUGERENCIA ACCIÓN IA</th>
                 <th>ACCIONES</th>
               </tr>
             </thead>
@@ -254,9 +257,13 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                       <span className={styles.customerName}>
                         {conv.customerName}
                       </span>
-                      <span className={styles.phoneNumber}>
-                        {conv.customerPhone}
-                      </span>
+                      <div className={styles.phoneContainer}>
+                        <CopyableField 
+                          text={conv.customerPhone} 
+                          fieldId={`phone-${conv.id}`}
+                          maxLength={20}
+                        />
+                      </div>
                     </div>
                   </td>
                   
@@ -265,11 +272,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                       <CopyableField 
                         text={conv.interest} 
                         fieldId={`interest-${conv.id}`}
-                        maxLength={30}
+                        showFullText={true}
                       />
                     ) : (
                       <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>
-                        Sin definir
+                        🤖 Sin analizar
                       </span>
                     )}
                   </td>
@@ -278,31 +285,47 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                     {getSalesPotentialBadge(conv.salesPotential)}
                   </td>
                   
-                  <td>
+                  <td className={styles.aiSummaryCell}>
                     {conv.aiSummary ? (
-                      <CopyableField 
-                        text={conv.aiSummary} 
-                        fieldId={`summary-${conv.id}`}
-                        maxLength={60}
-                      />
+                      <div className={styles.aiContent}>
+                        <div className={styles.expandableText} title={conv.aiSummary}>
+                          {conv.aiSummary}
+                        </div>
+                        <button
+                          className={styles.copyButton}
+                          onClick={() => handleCopy(conv.aiSummary!, `summary-${conv.id}`)}
+                          title={copiedField === `summary-${conv.id}` ? 'Copiado!' : 'Copiar resumen'}
+                        >
+                          {copiedField === `summary-${conv.id}` ? '✓' : '📋'}
+                        </button>
+                      </div>
                     ) : (
-                      <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                        🤖 Generando...
-                      </span>
+                      <div className={styles.generatingMessage}>
+                        <span className={styles.generatingIcon}>🤖</span>
+                        <span>Generando resumen...</span>
+                      </div>
                     )}
                   </td>
                   
-                  <td>
+                  <td className={styles.aiSuggestionCell}>
                     {conv.aiSuggestion ? (
-                      <CopyableField 
-                        text={conv.aiSuggestion} 
-                        fieldId={`suggestion-${conv.id}`}
-                        maxLength={60}
-                      />
+                      <div className={styles.aiContent}>
+                        <div className={styles.expandableText} title={conv.aiSuggestion}>
+                          {conv.aiSuggestion}
+                        </div>
+                        <button
+                          className={styles.copyButton}
+                          onClick={() => handleCopy(conv.aiSuggestion!, `suggestion-${conv.id}`)}
+                          title={copiedField === `suggestion-${conv.id}` ? 'Copiado!' : 'Copiar sugerencia'}
+                        >
+                          {copiedField === `suggestion-${conv.id}` ? '✓' : '📋'}
+                        </button>
+                      </div>
                     ) : (
-                      <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
-                        💡 Analizando...
-                      </span>
+                      <div className={styles.generatingMessage}>
+                        <span className={styles.generatingIcon}>💡</span>
+                        <span>Analizando y generando sugerencia...</span>
+                      </div>
                     )}
                   </td>
                   
@@ -310,9 +333,9 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                     <button
                       className={styles.viewButton}
                       onClick={() => onViewConversation?.(conv)}
-                      title="Ver conversación completa"
+                      title="Ver análisis completo y detalles de la conversación"
                     >
-                      👁️ Ver
+                      👁️ Ver Detalles
                     </button>
                   </td>
                 </tr>
@@ -336,7 +359,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       {filteredConversations.length > 0 && (
         <div className={styles.resultsCount}>
           Mostrando {filteredConversations.length} de {conversations.length} conversaciones
-          {selectedAIFilters.length > 0 && ` · Filtros IA: ${selectedAIFilters.length}`}
+          {selectedAIFilters.length > 0 && ` · Filtro IA activo`}
           {statusFilter !== 'todas' && ` · Estado: ${statusFilterButtons.find(b => b.id === statusFilter)?.label}`}
         </div>
       )}

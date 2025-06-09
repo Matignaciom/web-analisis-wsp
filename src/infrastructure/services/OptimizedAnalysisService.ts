@@ -80,21 +80,22 @@ export class OptimizedAnalysisService implements IAnalysisService {
         }
       }
 
-      // 2. Intentar análisis local primero
-      if (config.analysis.costOptimization.useLocalAnalysis) {
-        const localResult = this.tryLocalAnalysis(conversation)
-        if (localResult && localResult.confidence > 0.7) {
-          console.log(`🏠 Análisis local exitoso para: ${conversation.id}`)
-          this.cacheResult(conversation, localResult)
-          return localResult
-        }
-      }
-
-      // 3. Si no es posible análisis local, usar IA
+      // 2. PRIORIZAR ANÁLISIS CON IA SIEMPRE QUE ESTÉ DISPONIBLE
       if (this.openaiService) {
+        console.log(`🤖 Analizando con IA (${config.openai.model}) para: ${conversation.id}`)
         const aiResult = await this.analyzeWithAI(conversation)
         this.cacheResult(conversation, aiResult)
         return aiResult
+      }
+
+      // 3. Solo usar análisis local como respaldo si NO hay IA disponible
+      if (config.analysis.costOptimization.useLocalAnalysis) {
+        const localResult = this.tryLocalAnalysis(conversation)
+        if (localResult && localResult.confidence > 0.7) {
+          console.log(`🏠 Análisis local como respaldo para: ${conversation.id}`)
+          this.cacheResult(conversation, localResult)
+          return localResult
+        }
       }
 
       // 4. Fallback final
@@ -124,9 +125,34 @@ export class OptimizedAnalysisService implements IAnalysisService {
       return results
     }
 
-    // Análisis local en lote
+    // PRIORIZAR ANÁLISIS CON IA PARA TODO EL LOTE
+    if (this.openaiService && uncachedConversations.length > 0) {
+      console.log(`🤖 Analizando ${uncachedConversations.length} conversaciones con IA en lotes`)
+      
+      // Usar análisis en lote optimizado para IA
+      if (config.openai.batchAnalysis.enabled && uncachedConversations.length > 3) {
+        const batchResults = await this.analyzeBatchWithAI(uncachedConversations)
+        results.push(...batchResults)
+        return results
+      } else {
+        // Análisis individual con IA con delay optimizado
+        for (const conv of uncachedConversations) {
+          const aiResult = await this.analyzeWithAI(conv)
+          results.push(aiResult)
+          this.cacheResult(conv, aiResult)
+          
+          // Delay solo si hay más conversaciones
+          if (uncachedConversations.indexOf(conv) < uncachedConversations.length - 1) {
+            await this.delay(config.openai.batchAnalysis.delayBetweenBatches)
+          }
+        }
+        return results
+      }
+    }
+
+    // Solo usar análisis local como respaldo si NO hay IA disponible
     const localResults: AnalysisResult[] = []
-    const needsAIAnalysis: Conversation[] = []
+    const needsFallback: Conversation[] = []
 
     for (const conv of uncachedConversations) {
       const localResult = this.tryLocalAnalysis(conv)
@@ -134,33 +160,17 @@ export class OptimizedAnalysisService implements IAnalysisService {
         localResults.push(localResult)
         this.cacheResult(conv, localResult)
       } else {
-        needsAIAnalysis.push(conv)
+        needsFallback.push(conv)
       }
     }
 
     results.push(...localResults)
 
-    // Análisis con IA solo para los que realmente lo necesitan
-    if (needsAIAnalysis.length > 0 && this.openaiService) {
-      console.log(`🤖 Analizando ${needsAIAnalysis.length} conversaciones con IA`)
-      
-      // Usar análisis en lote optimizado
-      if (config.openai.batchAnalysis.enabled && needsAIAnalysis.length > 3) {
-        const batchResults = await this.analyzeBatchWithAI(needsAIAnalysis)
-        results.push(...batchResults)
-      } else {
-        // Análisis individual con delay optimizado
-        for (const conv of needsAIAnalysis) {
-          const aiResult = await this.analyzeWithAI(conv)
-          results.push(aiResult)
-          this.cacheResult(conv, aiResult)
-          
-          // Delay solo si hay más conversaciones
-          if (needsAIAnalysis.indexOf(conv) < needsAIAnalysis.length - 1) {
-            await this.delay(config.openai.batchAnalysis.delayBetweenBatches)
-          }
-        }
-      }
+    // Crear análisis de respaldo para conversaciones que no pudieron ser analizadas
+    for (const conv of needsFallback) {
+      const fallbackResult = this.createFallbackAnalysis(conv)
+      results.push(fallbackResult)
+      this.cacheResult(conv, fallbackResult)
     }
 
     return results

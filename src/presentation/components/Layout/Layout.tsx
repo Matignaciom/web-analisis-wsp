@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title = 'FB - IA' }) => {
               to="/dashboard" 
               className={`${styles.navLink} ${isDashboardActive ? styles.navLinkActive : ''}`}
             >
-              Dashboard
+              Inicio
             </NavLink>
             <NavLink 
               to="/upload" 

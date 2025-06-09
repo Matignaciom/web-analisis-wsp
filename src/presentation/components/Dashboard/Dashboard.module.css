@@ -168,19 +168,25 @@
 
 .dynamicGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
-  gap: clamp(0.75rem, 2vw, 1rem);
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: clamp(1rem, 2.5vw, 1.5rem);
   margin-top: 1.5rem;
+  max-width: 100%;
 }
 
 .dynamicCard {
   background: #ffffff;
   border-radius: 12px;
-  padding: clamp(1rem, 2.5vw, 1.25rem);
+  padding: clamp(1.25rem, 3vw, 1.75rem);
   border: 1px solid #e5e7eb;
   transition: all 0.3s ease;
   text-align: center;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .dynamicTitle {
@@ -354,7 +360,8 @@
   }
   
   .dynamicGrid {
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.25rem;
   }
 }
 
@@ -392,7 +399,8 @@
   }
   
   .dynamicGrid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
   }
 }
 
@@ -409,7 +417,8 @@
   }
   
   .dynamicGrid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.875rem;
   }
 }
 
@@ -424,6 +433,7 @@
   
   .dynamicGrid {
     grid-template-columns: 1fr;
+    gap: 0.75rem;
   }
 }
 
@@ -439,4 +449,150 @@
   .intentionCard {
     padding: 0.75rem;
   }
+}
+
+/* Componente de texto copiable generado por IA */
+.copyableContainer {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 12px 0;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.copyableContainer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #10b981, #f59e0b);
+  border-radius: 12px 12px 0 0;
+}
+
+.copyableContainer:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
+.aiSourceIndicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #3b82f6;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.aiSourceIndicator svg {
+  color: #10b981;
+}
+
+.copyableText {
+  position: relative;
+}
+
+.textLabel {
+  display: block;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.aiGeneratedText {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  color: #374151;
+  line-height: 1.6;
+  font-size: 14px;
+  min-height: 60px;
+  border-left: 4px solid #10b981;
+  position: relative;
+}
+
+.aiGeneratedText::before {
+  content: '🤖';
+  position: absolute;
+  top: -8px;
+  right: 8px;
+  background: #10b981;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.copyButton:hover {
+  background: #2563eb;
+  transform: scale(1.05);
+}
+
+.copyButton.copied {
+  background: #10b981;
+  transform: scale(1.1);
+}
+
+.copyButton.copied::after {
+  content: ' ✓';
+}
+
+/* Sección específica para contenido generado por IA */
+.aiContentSection {
+  background: linear-gradient(135deg, #fef3c7 0%, #fbbf24 100%);
+  border: 2px solid #f59e0b;
+  border-radius: 16px;
+  padding: 20px;
+  margin: 20px 0;
+  position: relative;
+}
+
+.aiContentSection::before {
+  content: '🧠 100% Generado por Inteligencia Artificial';
+  position: absolute;
+  top: -12px;
+  left: 20px;
+  background: #f59e0b;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.aiContentGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
 } 

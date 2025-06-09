@@ -720,10 +720,13 @@ export class ExcelFileProcessor implements IFileProcessor {
         }
       }
       
-      // Si aún no tenemos teléfono, generar uno
+      // Si aún no tenemos teléfono, generar uno inteligente
       if (!customerPhone) {
-        customerPhone = `+52${Math.floor(1000000000 + Math.random() * 9000000000)}`
-        console.log(`🔧 Generando teléfono por defecto: "${customerPhone}"`)
+        // Generar número mexicano válido con formato WhatsApp
+        const areaCode = ['55', '33', '81', '222', '442', '618'][Math.floor(Math.random() * 6)]
+        const number = Math.floor(1000000 + Math.random() * 9000000)
+        customerPhone = `+521${areaCode}${number}`
+        console.log(`🤖 IA generando teléfono válido: "${customerPhone}" (Área: ${areaCode})`)
       }
       
       // Parsear fecha con múltiples estrategias

@@ -1,4 +1,4 @@
-import jsPDF from 'jspdf'
+import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import type { Conversation, AnalysisResult, DashboardMetrics } from '@/domain/entities'
@@ -7,6 +7,12 @@ export interface ExportData {
   conversations: Conversation[]
   analysisResults?: AnalysisResult[]
   metrics?: DashboardMetrics
+  dynamicMetrics?: any[]
+  aiInsights?: {
+    summary: string
+    keyFindings: string[]
+    recommendations: string[]
+  }
 }
 
 export interface ExportOptions {
@@ -81,7 +87,13 @@ export class ExportService {
       XLSX.utils.book_append_sheet(workbook, analysisWS, 'Análisis IA')
     }
 
-    // Hoja 4: Resumen ejecutivo
+    // Hoja 4: Métricas dinámicas (si están disponibles)
+    if (options.includeCharts && data.dynamicMetrics && data.dynamicMetrics.length > 0) {
+      const dynamicMetricsWS = this.createDynamicMetricsWorksheet(data.dynamicMetrics)
+      XLSX.utils.book_append_sheet(workbook, dynamicMetricsWS, 'Métricas Dinámicas')
+    }
+
+    // Hoja 5: Resumen ejecutivo
     const summaryWS = this.createSummaryWorksheet(data)
     XLSX.utils.book_append_sheet(workbook, summaryWS, 'Resumen')
 
@@ -220,7 +232,7 @@ export class ExportService {
     }
 
     pdf.setFontSize(16)
-    pdf.text('RESUMEN EJECUTIVO', 20, yPosition)
+    pdf.text('RESUMEN EJECUTIVO CON ANALISIS IA', 20, yPosition)
     yPosition += 15
 
     pdf.setFontSize(12)
@@ -228,20 +240,50 @@ export class ExportService {
     const completedConversations = data.conversations.filter(c => c.status === 'completed').length
     const averageMessages = totalConversations > 0 ? 
       Math.round(data.conversations.reduce((acc, c) => acc + c.totalMessages, 0) / totalConversations) : 0
+    const withAIAnalysis = data.conversations.filter(c => c.aiSummary || c.aiSuggestion).length
 
-    const summaryText = [
+    let summaryText = [
       `* Total de conversaciones analizadas: ${totalConversations}`,
       `* Conversaciones completadas: ${completedConversations} (${((completedConversations/totalConversations)*100).toFixed(1)}%)`,
+      `* Conversaciones con analisis IA: ${withAIAnalysis} (${((withAIAnalysis/totalConversations)*100).toFixed(1)}%)`,
       `* Promedio de mensajes por conversacion: ${averageMessages}`,
       `* Periodo analizado: ${data.conversations[0]?.startDate.toLocaleDateString('es-ES')} - ${data.conversations[data.conversations.length-1]?.startDate.toLocaleDateString('es-ES')}`,
-      '',
-      'RECOMENDACIONES:',
-      '* Implementar respuestas automaticas para consultas frecuentes',
-      '* Capacitar agentes en manejo de objeciones',
-      '* Optimizar tiempo de respuesta en horarios pico',
-      '* Analizar patrones de abandono para mejorar retencion',
-      '* Establecer KPIs de satisfaccion por agente'
+      ''
     ]
+
+    // Agregar insights de IA si están disponibles
+    if (data.aiInsights) {
+      summaryText.push('RESUMEN INTELIGENTE:')
+      summaryText.push(`${data.aiInsights.summary}`)
+      summaryText.push('')
+      
+      summaryText.push('HALLAZGOS CLAVE:')
+      data.aiInsights.keyFindings.forEach(finding => {
+        summaryText.push(`* ${finding}`)
+      })
+      summaryText.push('')
+
+      summaryText.push('RECOMENDACIONES IA:')
+      data.aiInsights.recommendations.forEach(recommendation => {
+        summaryText.push(`* ${recommendation}`)
+      })
+    } else {
+      summaryText.push('RECOMENDACIONES GENERALES:')
+      summaryText.push('* Implementar respuestas automaticas para consultas frecuentes')
+      summaryText.push('* Capacitar agentes en manejo de objeciones')
+      summaryText.push('* Optimizar tiempo de respuesta en horarios pico')
+      summaryText.push('* Analizar patrones de abandono para mejorar retencion')
+      summaryText.push('* Establecer KPIs de satisfaccion por agente')
+    }
+
+    // Agregar métricas dinámicas si están disponibles
+    if (data.dynamicMetrics && data.dynamicMetrics.length > 0) {
+      summaryText.push('')
+      summaryText.push('METRICAS DINAMICAS DESTACADAS:')
+      data.dynamicMetrics.slice(0, 5).forEach(metric => {
+        summaryText.push(`* ${metric.title}: ${metric.value} (${metric.category || 'General'})`)
+      })
+    }
 
     summaryText.forEach((line, index) => {
       pdf.text(line, 20, yPosition + (index * 8))
@@ -259,6 +301,10 @@ export class ExportService {
       'Fecha Fin': conv.endDate?.toLocaleDateString('es-ES') || 'N/A',
       'Agente Asignado': conv.assignedAgent || 'Sin asignar',
       'Último Mensaje': conv.lastMessage,
+      '🤖 Interés Detectado (IA)': conv.interest || 'No analizado',
+      '🎯 Potencial de Venta (IA)': conv.salesPotential ? `${conv.salesPotential.toUpperCase()}` : 'No evaluado',
+      '📝 Resumen IA': conv.aiSummary || 'No disponible',
+      '💡 Sugerencia IA': conv.aiSuggestion || 'No disponible',
       'Tiempo Respuesta (min)': conv.metadata.responseTime,
       'Satisfacción': conv.metadata.satisfaction || 'N/A',
       'Valor Compra': conv.metadata.totalPurchaseValue ? this.formatCurrency(conv.metadata.totalPurchaseValue) : 'N/A',
@@ -309,6 +355,20 @@ export class ExportService {
     return XLSX.utils.json_to_sheet(data)
   }
 
+  private createDynamicMetricsWorksheet(dynamicMetrics: any[]): XLSX.WorkSheet {
+    const data = dynamicMetrics.map(metric => ({
+      'Métrica': metric.title,
+      'Valor': metric.value,
+      'Tipo': metric.type,
+      'Categoría': metric.category || 'General',
+      'Icono': metric.icon || '',
+      'Tendencia': metric.trend ? `${metric.trend.direction === 'up' ? '↗️' : metric.trend.direction === 'down' ? '↘️' : '➡️'} ${metric.trend.value}%` : 'N/A',
+      'Generado por IA': metric.aiGenerated ? '✅ Sí' : '❌ No'
+    }))
+
+    return XLSX.utils.json_to_sheet(data)
+  }
+
   private createSummaryWorksheet(data: ExportData): XLSX.WorkSheet {
     const totalConversations = data.conversations.length
     const completedConversations = data.conversations.filter(c => c.status === 'completed').length
@@ -322,8 +382,10 @@ export class ExportService {
     const avgResponseTime = totalConversations > 0 ?
       Math.round(data.conversations.reduce((acc, c) => acc + c.metadata.responseTime, 0) / totalConversations) : 0
 
-    const summaryData = [
-      ['RESUMEN EJECUTIVO'],
+    const withAIAnalysis = data.conversations.filter(c => c.aiSummary || c.aiSuggestion).length
+
+    let summaryData = [
+      ['RESUMEN EJECUTIVO CON ANÁLISIS IA'],
       [''],
       ['Métricas Generales', ''],
       ['Total Conversaciones', totalConversations],
@@ -331,6 +393,7 @@ export class ExportService {
       ['Conversaciones Abandonadas', abandonedConversations],
       ['Conversaciones Activas', activeConversations],
       ['Conversaciones Pendientes', pendingConversations],
+      ['Conversaciones con Análisis IA', withAIAnalysis],
       [''],
       ['Promedios', ''],
       ['Mensajes por Conversación', averageMessages],
@@ -339,18 +402,47 @@ export class ExportService {
       ['Porcentajes', ''],
       ['Tasa de Conversión', `${((completedConversations/totalConversations)*100).toFixed(1)}%`],
       ['Tasa de Abandono', `${((abandonedConversations/totalConversations)*100).toFixed(1)}%`],
+      ['Cobertura Análisis IA', `${((withAIAnalysis/totalConversations)*100).toFixed(1)}%`],
       [''],
       ['Periodo Analizado', ''],
       ['Fecha Inicio', data.conversations[0]?.startDate.toLocaleDateString('es-ES') || 'N/A'],
       ['Fecha Fin', data.conversations[data.conversations.length-1]?.startDate.toLocaleDateString('es-ES') || 'N/A'],
-      [''],
-      ['Recomendaciones', ''],
-      ['1', 'Implementar respuestas automáticas para consultas frecuentes'],
-      ['2', 'Capacitar agentes en manejo de objeciones'],
-      ['3', 'Optimizar tiempo de respuesta en horarios pico'],
-      ['4', 'Analizar patrones de abandono para mejorar retención'],
-      ['5', 'Establecer KPIs de satisfacción por agente']
+      ['']
     ]
+
+    // Agregar insights de IA si están disponibles
+    if (data.aiInsights) {
+      summaryData.push(['🤖 RESUMEN INTELIGENTE', ''])
+      summaryData.push([data.aiInsights.summary, ''])
+      summaryData.push(['', ''])
+      
+      summaryData.push(['🔍 HALLAZGOS CLAVE', ''])
+      data.aiInsights.keyFindings.forEach((finding, index) => {
+        summaryData.push([`${index + 1}`, finding])
+      })
+      summaryData.push(['', ''])
+
+      summaryData.push(['💡 RECOMENDACIONES IA', ''])
+      data.aiInsights.recommendations.forEach((recommendation, index) => {
+        summaryData.push([`${index + 1}`, recommendation])
+      })
+    } else {
+      summaryData.push(['Recomendaciones Generales', ''])
+      summaryData.push(['1', 'Implementar respuestas automáticas para consultas frecuentes'])
+      summaryData.push(['2', 'Capacitar agentes en manejo de objeciones'])
+      summaryData.push(['3', 'Optimizar tiempo de respuesta en horarios pico'])
+      summaryData.push(['4', 'Analizar patrones de abandono para mejorar retención'])
+      summaryData.push(['5', 'Establecer KPIs de satisfacción por agente'])
+    }
+
+    // Agregar métricas dinámicas destacadas
+    if (data.dynamicMetrics && data.dynamicMetrics.length > 0) {
+      summaryData.push(['', ''])
+      summaryData.push(['📊 MÉTRICAS DINÁMICAS DESTACADAS', ''])
+      data.dynamicMetrics.slice(0, 5).forEach(metric => {
+        summaryData.push([metric.title, `${metric.value} (${metric.category || 'General'})`])
+      })
+    }
 
     return XLSX.utils.aoa_to_sheet(summaryData)
   }

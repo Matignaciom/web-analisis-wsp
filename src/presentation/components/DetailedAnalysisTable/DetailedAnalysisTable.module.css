@@ -171,14 +171,17 @@
 
 .tableContainer {
   overflow-x: auto;
-  max-height: 600px;
+  max-height: 700px;
   overflow-y: auto;
+  min-width: 100%;
 }
 
 .table {
   width: 100%;
+  min-width: 1400px;
   border-collapse: collapse;
   font-size: 14px;
+  table-layout: fixed;
 }
 
 .table thead {
@@ -197,6 +200,13 @@
   white-space: nowrap;
   border-bottom: 1px solid #e5e7eb;
 }
+
+.table th:nth-child(1) { width: 200px; } /* Cliente */
+.table th:nth-child(2) { width: 220px; min-width: 180px; } /* Interés */
+.table th:nth-child(3) { width: 120px; } /* Potencial */
+.table th:nth-child(4) { width: 400px; } /* Resumen IA */
+.table th:nth-child(5) { width: 400px; } /* Sugerencia IA */
+.table th:nth-child(6) { width: 120px; } /* Acciones */
 
 .table tbody tr {
   border-bottom: 1px solid #f3f4f6;
@@ -224,10 +234,18 @@
   margin-bottom: 2px;
 }
 
-.phoneNumber {
+.phoneContainer {
+  margin-top: 4px;
+}
+
+.phoneContainer .copyableField {
   font-size: 12px;
-  color: #6b7280;
   font-family: 'Courier New', monospace;
+}
+
+.phoneContainer .fieldText {
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .copyableField {
@@ -238,11 +256,11 @@
 }
 
 .fieldText {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   flex: 1;
   min-width: 0;
+  word-wrap: break-word;
+  white-space: normal;
+  line-height: 1.4;
 }
 
 .copyButton {
@@ -301,19 +319,28 @@
   background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
   color: white;
   border: none;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2);
+  white-space: nowrap;
 }
 
 .viewButton:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.viewButton:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
 }
 
 .emptyState {
@@ -412,5 +439,111 @@
   
   .customerCell {
     min-width: 100px;
+  }
+  
+  .aiSummaryCell,
+  .aiSuggestionCell {
+    min-width: 250px;
+    max-width: 300px;
+  }
+  
+  .expandableText {
+    font-size: 12px;
+    padding: 10px;
+  }
+  
+  .aiContent .copyButton {
+    padding: 4px 6px;
+    font-size: 10px;
+  }
+  
+  .viewButton {
+    padding: 6px 12px;
+    font-size: 11px;
+  }
+}
+
+/* Estilos para contenido de IA */
+.aiSummaryCell,
+.aiSuggestionCell {
+  min-width: 350px;
+  max-width: 500px;
+  padding: 8px !important;
+  vertical-align: top;
+  word-wrap: break-word;
+  white-space: normal;
+}
+
+.aiContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+}
+
+.expandableText {
+  flex: 1;
+  line-height: 1.5;
+  color: #374151;
+  font-size: 13px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border-left: 3px solid #3b82f6;
+  margin: 0;
+  min-height: 40px;
+  max-height: none;
+  overflow: visible;
+}
+
+.aiContent .copyButton {
+  flex-shrink: 0;
+  margin-top: 8px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.2s ease;
+}
+
+.aiContent .copyButton:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.aiContent .copyButton:active {
+  background: #10b981;
+}
+
+.generatingMessage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #fef3c7;
+  border-radius: 6px;
+  color: #92400e;
+  font-style: italic;
+  font-size: 12px;
+  border-left: 3px solid #f59e0b;
+}
+
+.generatingIcon {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 } 

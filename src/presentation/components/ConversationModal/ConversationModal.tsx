@@ -120,10 +120,26 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
             <div className={styles.aiAnalysis}>
               <div className={styles.aiItem}>
                 <span className={styles.aiLabel}>💡 Interés del Cliente:</span>
-                <p className={styles.aiValue}>
-                  {conversation.interest || 'No identificado'}
-                </p>
+                <div className={styles.aiContentBox}>
+                  <p className={styles.aiValue}>
+                    {conversation.interest || 'No identificado'}
+                  </p>
+                  {conversation.interest && (
+                    <button
+                      className={styles.copyIconButton}
+                      onClick={() => {
+                        navigator.clipboard.writeText(conversation.interest!)
+                          .then(() => alert('✅ Interés copiado'))
+                          .catch(() => alert('❌ Error al copiar'))
+                      }}
+                      title="Copiar interés"
+                    >
+                      📋
+                    </button>
+                  )}
+                </div>
               </div>
+              
               <div className={styles.aiItem}>
                 <span className={styles.aiLabel}>📊 Potencial de Venta:</span>
                 <span 
@@ -133,17 +149,49 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                   {conversation.salesPotential?.toUpperCase() || 'NO EVALUADO'}
                 </span>
               </div>
+              
               <div className={styles.aiItem}>
-                <span className={styles.aiLabel}>📝 Resumen:</span>
-                <p className={styles.aiValue}>
-                  {conversation.aiSummary || '🤖 Generando...'}
-                </p>
+                <span className={styles.aiLabel}>📝 Resumen Completo:</span>
+                <div className={styles.aiContentBox}>
+                  <div className={styles.expandedAiText}>
+                    {conversation.aiSummary || '🤖 Generando resumen...'}
+                  </div>
+                  {conversation.aiSummary && (
+                    <button
+                      className={styles.copyIconButton}
+                      onClick={() => {
+                        navigator.clipboard.writeText(conversation.aiSummary!)
+                          .then(() => alert('✅ Resumen copiado'))
+                          .catch(() => alert('❌ Error al copiar'))
+                      }}
+                      title="Copiar resumen completo"
+                    >
+                      📋
+                    </button>
+                  )}
+                </div>
               </div>
+              
               <div className={styles.aiItem}>
-                <span className={styles.aiLabel}>🎯 Sugerencia:</span>
-                <p className={styles.aiValue}>
-                  {conversation.aiSuggestion || '💡 Analizando...'}
-                </p>
+                <span className={styles.aiLabel}>🎯 Sugerencia de Acción:</span>
+                <div className={styles.aiContentBox}>
+                  <div className={styles.expandedAiText}>
+                    {conversation.aiSuggestion || '💡 Analizando y generando sugerencia...'}
+                  </div>
+                  {conversation.aiSuggestion && (
+                    <button
+                      className={styles.copyIconButton}
+                      onClick={() => {
+                        navigator.clipboard.writeText(conversation.aiSuggestion!)
+                          .then(() => alert('✅ Sugerencia copiada'))
+                          .catch(() => alert('❌ Error al copiar'))
+                      }}
+                      title="Copiar sugerencia completa"
+                    >
+                      📋
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -152,6 +200,22 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>💬 Último Mensaje</h3>
             <div className={styles.messageBox}>
+              <div className={styles.messageHeader}>
+                <span className={styles.messageInfo}>
+                  📅 {formatDate(conversation.startDate)}
+                </span>
+                <button
+                  className={styles.copyIconButton}
+                  onClick={() => {
+                    navigator.clipboard.writeText(conversation.lastMessage)
+                      .then(() => alert('✅ Mensaje copiado'))
+                      .catch(() => alert('❌ Error al copiar'))
+                  }}
+                  title="Copiar mensaje"
+                >
+                  📋
+                </button>
+              </div>
               <p className={styles.messageContent}>
                 "{conversation.lastMessage}"
               </p>

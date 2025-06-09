@@ -3,10 +3,10 @@ import { Toaster } from 'react-hot-toast'
 import { Dashboard } from '@/presentation/components/Dashboard'
 import { FileUploader } from '@/presentation/components/FileUploader'
 import ConversationModal from '@/presentation/components/ConversationModal'
-import CostOptimization from '@/presentation/components/CostOptimization'
+
 import AIInsightsPanel from '@/presentation/components/AIInsightsPanel'
 import DetailedAnalysisTable from '@/presentation/components/DetailedAnalysisTable'
-import SampleDataButton from '@/presentation/components/SampleDataButton/SampleDataButton'
+
 import { useFileProcessor } from '@/hooks/useFileProcessor'
 import { useConversationUpdater } from '@/hooks/useConversationUpdater'
 import { useConversations } from '@/presentation/store/useAppStore'
@@ -23,6 +23,8 @@ const SinglePageDashboard = () => {
   
   // Hook para actualizar conversaciones con análisis de IA
   useConversationUpdater()
+
+
 
   const handleFileSelect = (file: File) => {
     console.log('📁 Archivo seleccionado:', file.name)
@@ -60,8 +62,8 @@ const SinglePageDashboard = () => {
   const handleAIFilterSelect = (filterId: string) => {
     setSelectedAIFilters(prev => 
       prev.includes(filterId)
-        ? prev.filter(id => id !== filterId)
-        : [...prev, filterId]
+        ? [] // Si el filtro ya está activo, lo desactivamos (array vacío)
+        : [filterId] // Si no está activo, activamos solo este filtro
     )
   }
 
@@ -128,51 +130,9 @@ const SinglePageDashboard = () => {
           </div>
         )}
 
-        <div className="format-guide">
-          <h3>💡 Formato esperado del archivo:</h3>
-          <div className="format-columns">
-            <div className="format-column">
-              <h4>Columnas requeridas:</h4>
-              <ul>
-                <li><strong>Cliente/Nombre:</strong> Nombre del cliente</li>
-                <li><strong>Teléfono/WhatsApp:</strong> Número de teléfono</li>
-                <li><strong>Fecha:</strong> Fecha de inicio</li>
-                <li><strong>Estado:</strong> activo, completado, abandonado, pendiente</li>
-              </ul>
-            </div>
-            <div className="format-column">
-              <h4>Columnas opcionales:</h4>
-              <ul>
-                <li><strong>Mensajes:</strong> Cantidad total de mensajes</li>
-                <li><strong>Último mensaje:</strong> Contenido del último mensaje</li>
-                <li><strong>Agente:</strong> Agente asignado</li>
-              </ul>
-            </div>
-          </div>
-          
-          <div className="security-note">
-            <strong>🔒 Seguridad:</strong> Todos los archivos se almacenan de forma segura en Supabase Storage 
-            con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
-          </div>
-        </div>
-
-        {/* Botón de datos de muestra */}
-        <div style={{ textAlign: 'center', margin: '24px 0' }}>
-          <div style={{ 
-            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
-            padding: '20px', 
-            borderRadius: '12px',
-            border: '2px dashed #cbd5e1',
-            marginBottom: '16px'
-          }}>
-            <h4 style={{ margin: '0 0 8px 0', color: '#475569' }}>
-              🚀 ¿Quieres probar inmediatamente?
-            </h4>
-            <p style={{ margin: '0 0 16px 0', color: '#64748b', fontSize: '14px' }}>
-              Carga datos de muestra para ver todas las funcionalidades en acción
-            </p>
-            <SampleDataButton />
-          </div>
+        <div className="security-note" style={{ marginTop: '24px' }}>
+          <strong>🔒 Seguridad:</strong> Todos los archivos se almacenan de forma segura en Supabase Storage 
+          con políticas de acceso restringido. Los datos se procesan de manera privada y confidencial.
         </div>
       </div>
 
@@ -180,65 +140,18 @@ const SinglePageDashboard = () => {
       {conversations.length > 0 && (
         <div className="dashboard-section">
           <div className="section-header">
-            <h2>📊 Dashboard de Análisis</h2>
-            <p>Métricas y insights de tus conversaciones de WhatsApp</p>
+            <h2>📈 Vista General del Negocio</h2>
+            <p>Resumen ejecutivo y métricas clave de rendimiento</p>
           </div>
           
           <Dashboard 
             conversations={conversations}
-            metrics={{
-              totalConversations: conversations.length,
-              completedSales: conversations.filter(c => c.status === 'completed').length,
-              abandonedChats: conversations.filter(c => c.status === 'abandoned').length,
-              averageResponseTime: conversations.length > 0 ? 
-                `${Math.round(conversations.reduce((sum, c) => sum + (c.metadata?.responseTime || 5), 0) / conversations.length)} min` : 
-                '0 min'
-            }}
-            dynamicData={[
-              {
-                title: 'Clientes Únicos',
-                value: new Set(conversations.map(c => c.customerPhone)).size,
-                type: 'number',
-                category: 'Alcance'
-              },
-              {
-                title: 'Total Mensajes',
-                value: conversations.reduce((sum, c) => sum + (c.totalMessages || 0), 0),
-                type: 'number',
-                category: 'Actividad'
-              },
-              {
-                title: 'Tasa de Conversión',
-                value: conversations.length > 0 ? 
-                  Math.round((conversations.filter(c => c.status === 'completed').length / conversations.length) * 100) : 0,
-                type: 'percentage',
-                category: 'Rendimiento'
-              },
-              {
-                title: 'Agentes Activos',
-                value: new Set(conversations.filter(c => c.assignedAgent).map(c => c.assignedAgent)).size,
-                type: 'number',
-                category: 'Equipo'
-              }
-            ]}
           />
-          
-          {/* Cost Optimization - Desplegable en el dashboard */}
-          <CostOptimization 
-            conversationCount={conversations.length}
-            className="cost-optimization-widget"
-          />
+
         </div>
       )}
 
-      {/* Cost Optimization - Solo visible si no hay conversaciones */}
-      {conversations.length === 0 && (
-        <div className="cost-optimization-widget">
-          <CostOptimization 
-            conversationCount={1000}
-          />
-        </div>
-      )}
+
 
       {/* AI Insights Panel - Visible cuando hay datos */}
       {conversations.length > 0 && (
@@ -272,46 +185,9 @@ const SinglePageDashboard = () => {
         </div>
       )}
 
-      {/* Empty State - Cuando no hay datos */}
-      {conversations.length === 0 && !isProcessing && (
-        <div className="empty-state">
-          <h3>📤 ¡Comienza analizando tus conversaciones!</h3>
-          <p>
-            Sube un archivo Excel o CSV con tus conversaciones de WhatsApp arriba
-            para ver análisis detallados con IA, métricas y insights avanzados.
-          </p>
-        </div>
-      )}
 
-      {/* Footer Stats - Visible cuando hay datos */}
-      {conversations.length > 0 && (
-        <div className="footer-stats">
-          <div className="stats-container">
-            <div className="stat-item">
-              <span className="stat-value">{conversations.length}</span>
-              <span className="stat-label">Conversaciones</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">
-                {conversations.filter(c => c.status === 'completed').length}
-              </span>
-              <span className="stat-label">Completadas</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">
-                {conversations.reduce((acc, c) => acc + c.totalMessages, 0)}
-              </span>
-              <span className="stat-label">Mensajes Total</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-value">
-                {new Set(conversations.filter(c => c.assignedAgent).map(c => c.assignedAgent)).size}
-              </span>
-              <span className="stat-label">Agentes</span>
-            </div>
-          </div>
-        </div>
-      )}
+
+
 
       {selectedConversation && (
         <ConversationModal

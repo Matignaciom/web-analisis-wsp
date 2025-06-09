@@ -1,7 +1,7 @@
-import type { IFileProcessor } from '@/domain/interfaces/IFileProcessor'
-import type { IConversationRepository } from '@/domain/interfaces/IConversationRepository'
-import type { IAnalysisService } from '@/domain/interfaces/IAnalysisService'
-import { SupabaseStorageService } from '@/infrastructure/services/SupabaseStorageService'
+import type { IFileProcessor } from '../../domain/interfaces/IFileProcessor'
+import type { IConversationRepository } from '../../domain/interfaces/IConversationRepository'
+import type { IAnalysisService } from '../../domain/interfaces/IAnalysisService'
+import { SupabaseStorageService } from '../../infrastructure/services/SupabaseStorageService'
 
 export class ProcessFileUseCase {
   private storageService: SupabaseStorageService
