@@ -54,6 +54,11 @@ export class ExportService {
       yPosition = this.addMetricsToPDF(pdf, data.metrics, yPosition)
     }
 
+    // Métricas dinámicas de rendimiento si están disponibles
+    if (options.includeCharts && data.dynamicMetrics && data.dynamicMetrics.length > 0) {
+      yPosition = this.addDynamicMetricsToPDF(pdf, data.dynamicMetrics, yPosition)
+    }
+
     // Tabla de conversaciones
     yPosition = this.addConversationsTableToPDF(pdf, data.conversations, yPosition)
 
@@ -125,6 +130,77 @@ export class ExportService {
     })
 
     return (pdf as any).lastAutoTable.finalY + 20
+  }
+
+  private addDynamicMetricsToPDF(pdf: jsPDF, dynamicMetrics: any[], yPosition: number): number {
+    if (yPosition > 230) {
+      pdf.addPage()
+      yPosition = 20
+    }
+
+    pdf.setFontSize(16)
+    pdf.text('📈 MÉTRICAS DE RENDIMIENTO DINÁMICAS', 20, yPosition)
+    yPosition += 10
+
+    pdf.setFontSize(10)
+    pdf.text('Análisis avanzado generado automáticamente por IA', 20, yPosition)
+    yPosition += 15
+
+    // Agrupar métricas por categoría
+    const categorizedMetrics: Record<string, any[]> = {}
+    dynamicMetrics.forEach(metric => {
+      const category = metric.category || 'General'
+      if (!categorizedMetrics[category]) {
+        categorizedMetrics[category] = []
+      }
+      categorizedMetrics[category].push(metric)
+    })
+
+    // Añadir cada categoría como una tabla separada
+    Object.entries(categorizedMetrics).forEach(([category, metrics]) => {
+      if (yPosition > 240) {
+        pdf.addPage()
+        yPosition = 20
+      }
+
+      pdf.setFontSize(12)
+      pdf.text(`🔹 ${category}`, 20, yPosition)
+      yPosition += 10
+
+      const metricsData = metrics.map(metric => {
+        const trendText = metric.trend ? 
+          `${metric.trend.direction === 'up' ? '↗️' : metric.trend.direction === 'down' ? '↘️' : '➡️'} ${metric.trend.value}%` : 
+          'N/A'
+        
+        return [
+          metric.title,
+          metric.value.toString(),
+          metric.type,
+          trendText,
+          metric.aiGenerated ? '🤖 IA' : '📊 Calc'
+        ]
+      })
+
+      autoTable(pdf, {
+        startY: yPosition,
+        head: [['Métrica', 'Valor', 'Tipo', 'Tendencia', 'Fuente']],
+        body: metricsData,
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [139, 92, 246], fontSize: 9 },
+        columnStyles: {
+          0: { cellWidth: 45 },  // Métrica
+          1: { cellWidth: 25 },  // Valor
+          2: { cellWidth: 20 },  // Tipo
+          3: { cellWidth: 25 },  // Tendencia
+          4: { cellWidth: 15 }   // Fuente
+        },
+        margin: { left: 20, right: 20 }
+      })
+
+      yPosition = (pdf as any).lastAutoTable.finalY + 15
+    })
+
+    return yPosition
   }
 
   private addConversationsTableToPDF(pdf: jsPDF, conversations: Conversation[], yPosition: number): number {

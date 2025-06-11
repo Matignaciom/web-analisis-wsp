@@ -198,10 +198,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const getColorForCategory = (category?: string): 'blue' | 'green' | 'red' | 'yellow' | 'purple' => {
       switch (category) {
-        case 'Ventas': return 'green'
-        case 'Clientes': return 'blue'
+        case 'Análisis de Ventas': return 'green'
+        case 'Análisis de Clientes': return 'blue'
         case 'Recursos Humanos': return 'purple'
         case 'Análisis Temporal': return 'yellow'
+        case 'Análisis de Contenido': return 'blue'
+        case 'Satisfacción del Cliente': return 'green'
+        case 'Ventas': return 'green'
+        case 'Clientes': return 'blue'
         case 'Engagement': return 'blue'
         default: return 'blue'
       }
@@ -236,7 +240,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     return (
       <div className={styles.dashboard}>
         <div className={styles.dashboardTitle}>
-          <h2>📊 Dashboard Analítico</h2>
           <p style={{ color: '#ef4444' }}>Error al generar métricas: {error}</p>
         </div>
       </div>
@@ -247,7 +250,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     return (
       <div className={styles.dashboard}>
         <div className={styles.dashboardTitle}>
-          <h2>📊 Dashboard Analítico</h2>
           <p>Generando métricas dinámicas...</p>
         </div>
       </div>
@@ -258,11 +260,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className={styles.dashboard}>
-      <div className={styles.dashboardTitle}>
-        <h2>📊 Dashboard Analítico Inteligente</h2>
-        <p>Métricas generadas automáticamente desde los datos de tu Excel</p>
-      </div>
-
       {/* Insights generados por IA */}
       <div className={styles.aiContentSection}>
         <div className={styles.aiContentGrid}>
@@ -284,78 +281,58 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Métricas principales calculadas desde Excel - Generadas dinámicamente */}
+      {/* Métricas principales extraídas 100% del Excel */}
       <div className={styles.metricsGrid}>
-        {/* Solo mostrar métricas si tienen valores válidos */}
-        {mainMetrics.totalConversations > 0 && (
-          <MetricCard
-            title="Total Conversaciones"
-            value={mainMetrics.totalConversations.toLocaleString()}
-            icon={<Users size={24} />}
-            color="blue"
-            subtitle="Desde archivo Excel"
-          />
-        )}
+        {/* SIEMPRE mostrar métricas básicas ya que vienen del Excel */}
+        <MetricCard
+          title="Total Conversaciones"
+          value={mainMetrics.totalConversations.toLocaleString()}
+          icon={<Users size={24} />}
+          color="blue"
+          subtitle="Del archivo Excel cargado"
+        />
         
-        {mainMetrics.completedSales > 0 && (
-          <MetricCard
-            title="Ventas Completadas"
-            value={mainMetrics.completedSales.toLocaleString()}
-            icon={<CheckCircle size={24} />}
-            color="green"
-            subtitle="Estado: Completado"
-          />
-        )}
+        <MetricCard
+          title="Ventas Completadas"
+          value={mainMetrics.completedSales.toLocaleString()}
+          icon={<CheckCircle size={24} />}
+          color="green"
+          subtitle={`${((mainMetrics.completedSales / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
+        />
         
-        {mainMetrics.abandonedChats > 0 && (
-          <MetricCard
-            title="Conversaciones Abandonadas"
-            value={mainMetrics.abandonedChats.toLocaleString()}
-            icon={<XCircle size={24} />}
-            color="red"
-            subtitle="Requieren seguimiento"
-          />
-        )}
+        <MetricCard
+          title="Conversaciones Abandonadas"
+          value={mainMetrics.abandonedChats.toLocaleString()}
+          icon={<XCircle size={24} />}
+          color="red"
+          subtitle={`${((mainMetrics.abandonedChats / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
+        />
         
-        {mainMetrics.averageResponseTime && mainMetrics.averageResponseTime !== '0 min' && (
-          <MetricCard
-            title="Tiempo Promedio Respuesta"
-            value={mainMetrics.averageResponseTime}
-            icon={<Clock size={24} />}
-            color="yellow"
-            subtitle="Basado en metadata"
-          />
-        )}
+        <MetricCard
+          title="Tiempo Promedio Respuesta"
+          value={mainMetrics.averageResponseTime}
+          icon={<Clock size={24} />}
+          color="yellow"
+          subtitle="Calculado desde datos reales"
+        />
 
-        {mainMetrics.conversionRate !== undefined && mainMetrics.conversionRate > 0 && (
-          <MetricCard
-            title="Tasa de Conversión"
-            value={`${mainMetrics.conversionRate.toFixed(1)}%`}
-            icon={<Target size={24} />}
-            color="purple"
-            subtitle="Calculado automáticamente"
-          />
-        )}
+        <MetricCard
+          title="Tasa de Conversión"
+          value={`${mainMetrics.conversionRate.toFixed(1)}%`}
+          icon={<Target size={24} />}
+          color="purple"
+          subtitle="Basado en estados del Excel"
+        />
 
+        {/* Solo mostrar satisfacción si hay datos reales */}
         {mainMetrics.satisfactionScore !== undefined && mainMetrics.satisfactionScore > 0 && (
           <MetricCard
             title="Satisfacción Promedio"
             value={`${mainMetrics.satisfactionScore.toFixed(1)}/5`}
             icon={<MessageSquare size={24} />}
             color="green"
-            subtitle="De datos disponibles"
+            subtitle="Datos disponibles en Excel"
           />
-        )}
-
-        {/* Generar métricas dinámicas en la grilla principal si no hay suficientes métricas básicas */}
-        {dynamicMetrics && dynamicMetrics.length > 0 && (
-          <>
-            {dynamicMetrics.slice(0, Math.max(0, 6 - Object.keys(mainMetrics).filter(key => 
-              mainMetrics[key as keyof typeof mainMetrics] !== undefined && 
-              mainMetrics[key as keyof typeof mainMetrics] !== 0 && 
-              mainMetrics[key as keyof typeof mainMetrics] !== '0 min'
-            ).length)).map((metric) => renderDynamicMetric(metric))}
-          </>
         )}
       </div>
 

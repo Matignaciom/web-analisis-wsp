@@ -150,7 +150,7 @@ const ExportPage: React.FC<ExportPageProps> = ({ className = '' }) => {
           <div className={styles.emptyIcon}>
             <FileText size={64} />
           </div>
-          <h2>📤 No hay datos para exportar</h2>
+          <h2>📋 No hay datos para exportar</h2>
           <p>
             Primero necesitas cargar y procesar conversaciones de WhatsApp 
             para poder generar reportes.
@@ -170,17 +170,6 @@ const ExportPage: React.FC<ExportPageProps> = ({ className = '' }) => {
 
   return (
     <div className={`${styles.exportPage} ${className}`}>
-      <motion.div 
-        className={styles.header}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <h1 className={styles.title}>📤 Exportar Resultados</h1>
-        <p className={styles.subtitle}>
-          Genera reportes profesionales de tus análisis de conversaciones WhatsApp con IA avanzada
-        </p>
-      </motion.div>
-
       <div className={styles.content}>
         {/* Panel de Configuración */}
         <motion.div 

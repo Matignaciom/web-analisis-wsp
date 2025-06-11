@@ -101,7 +101,7 @@ const SinglePageDashboard = () => {
       {/* Upload Section - Siempre visible */}
       <div className="upload-section">
         <div className="section-header">
-          <h2>📊 Cargar Archivo de Conversaciones</h2>
+          <h2>📁 Cargar Archivo de Conversaciones</h2>
           <p>
             Sube tu archivo Excel o CSV con las conversaciones para obtener análisis detallados
             usando IA avanzada para sentimientos, intenciones y métricas.
@@ -140,7 +140,7 @@ const SinglePageDashboard = () => {
       {conversations.length > 0 && (
         <div className="dashboard-section">
           <div className="section-header">
-            <h2>📈 Vista General del Negocio</h2>
+            <h2>📈 Métricas de Rendimiento</h2>
             <p>Resumen ejecutivo y métricas clave de rendimiento</p>
           </div>
           
@@ -177,8 +177,8 @@ const SinglePageDashboard = () => {
       {conversations.length > 0 && (
         <div className="export-section">
           <div className="section-header">
-            <h2>📋 Exportar Datos</h2>
-            <p>Genera reportes en PDF o Excel con los análisis realizados</p>
+            <h2>💾 Descargar Análisis</h2>
+            <p>Exporta tus resultados en formato PDF o Excel</p>
           </div>
           
           <ExportPage />

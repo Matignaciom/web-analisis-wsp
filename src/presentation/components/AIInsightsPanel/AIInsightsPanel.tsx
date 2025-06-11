@@ -28,47 +28,65 @@ const AIInsightsPanel: React.FC<AIInsightsPanelProps> = ({
   const aiInsights = useMemo(() => {
     const insights: AIInsightType[] = []
     
-    // Análisis de sugerencias basado en las conversaciones
-    const proactiveCount = conversations.filter(conv => 
-      conv.aiSuggestion?.toLowerCase().includes('iniciar') ||
-      conv.aiSuggestion?.toLowerCase().includes('proactiv') ||
-      conv.aiSuggestion?.toLowerCase().includes('contactar') ||
-      conv.status === 'pending'
-    ).length
-
-    const followUpCount = conversations.filter(conv => 
-      conv.aiSuggestion?.toLowerCase().includes('seguimiento') ||
-      conv.aiSuggestion?.toLowerCase().includes('follow') ||
-      conv.aiSuggestion?.toLowerCase().includes('continuar') ||
-      conv.status === 'active'
-    ).length
-
-    const pricingCount = conversations.filter(conv => 
-      conv.interest?.toLowerCase().includes('precio') ||
-      conv.interest?.toLowerCase().includes('costo') ||
-      conv.interest?.toLowerCase().includes('cuanto') ||
-      conv.lastMessage?.toLowerCase().includes('precio')
-    ).length
-
-    const supportCount = conversations.filter(conv => 
-      conv.interest?.toLowerCase().includes('soporte') ||
-      conv.interest?.toLowerCase().includes('ayuda') ||
-      conv.interest?.toLowerCase().includes('problema') ||
-      conv.aiSuggestion?.toLowerCase().includes('soporte')
-    ).length
-
-    const negotiationCount = conversations.filter(conv => 
-      conv.aiSuggestion?.toLowerCase().includes('negocia') ||
-      conv.aiSuggestion?.toLowerCase().includes('oferta') ||
-      conv.aiSuggestion?.toLowerCase().includes('descuento') ||
-      conv.salesPotential === 'high'
-    ).length
-
-    const generalCount = conversations.filter(conv => 
-      conv.interest?.toLowerCase().includes('general') ||
-      conv.interest?.toLowerCase().includes('información') ||
-      (!conv.interest || conv.interest === 'Sin definir')
-    ).length
+    // 🎯 ANÁLISIS MEJORADO DE SUGERENCIAS (sin duplicaciones)
+    // Clasificar cada conversación en UNA SOLA categoría principal
+    const conversationsClassified = conversations.map(conv => {
+      // Priorizar por sugerencia IA específica primero
+      const suggestion = conv.aiSuggestion?.toLowerCase() || ''
+      const interest = conv.interest?.toLowerCase() || ''
+      const lastMsg = conv.lastMessage?.toLowerCase() || ''
+      
+      // 1. Prioridad alta: Oportunidades de venta (alta conversión)
+      if (conv.salesPotential === 'high' || 
+          suggestion.includes('negocia') || 
+          suggestion.includes('oferta') || 
+          suggestion.includes('descuento')) {
+        return { ...conv, category: 'negotiation' }
+      }
+      
+      // 2. Consultas de precio (específicas)
+      if (interest.includes('precio') || 
+          interest.includes('costo') || 
+          lastMsg.includes('precio') || 
+          lastMsg.includes('cuanto')) {
+        return { ...conv, category: 'pricing' }
+      }
+      
+      // 3. Seguimiento activo
+      if (conv.status === 'active' || 
+          suggestion.includes('seguimiento') || 
+          suggestion.includes('follow') || 
+          suggestion.includes('continuar')) {
+        return { ...conv, category: 'followUp' }
+      }
+      
+      // 4. Soporte y problemas
+      if (interest.includes('soporte') || 
+          interest.includes('ayuda') || 
+          interest.includes('problema') || 
+          suggestion.includes('soporte')) {
+        return { ...conv, category: 'support' }
+      }
+      
+      // 5. Conversación proactiva (pendientes)
+      if (conv.status === 'pending' || 
+          suggestion.includes('iniciar') || 
+          suggestion.includes('proactiv') || 
+          suggestion.includes('contactar')) {
+        return { ...conv, category: 'proactive' }
+      }
+      
+      // 6. General (resto)
+      return { ...conv, category: 'general' }
+    })
+    
+    // Contar cada categoría SIN duplicaciones
+    const proactiveCount = conversationsClassified.filter(c => c.category === 'proactive').length
+    const followUpCount = conversationsClassified.filter(c => c.category === 'followUp').length
+    const pricingCount = conversationsClassified.filter(c => c.category === 'pricing').length
+    const supportCount = conversationsClassified.filter(c => c.category === 'support').length
+    const negotiationCount = conversationsClassified.filter(c => c.category === 'negotiation').length
+    const generalCount = conversationsClassified.filter(c => c.category === 'general').length
 
     // Solo agregar insights que tengan conversaciones
     if (proactiveCount > 0) {

@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react'
 import type { Conversation } from '@/domain/entities/Conversation'
 import { useExport } from '@/hooks/useExport'
+import { useDynamicDashboard } from '@/hooks/useDynamicDashboard'
+import { SentimentLabel, IntentType } from '@/domain/entities/AnalysisResult'
 import styles from './DetailedAnalysisTable.module.css'
 
 interface DetailedAnalysisTableProps {
@@ -20,11 +22,32 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
 }) => {
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todas')
-  const { exportToExcel, isExporting } = useExport()
+  const [searchTerm, setSearchTerm] = useState('')
+  const { exportToExcel, exportToPDF, isExporting } = useExport()
+  
+  // Obtener dashboard dinámico para incluir en exportaciones
+  const { dashboard } = useDynamicDashboard({
+    conversations,
+    autoUpdate: false
+  })
 
-  // Filtrar conversaciones basado en filtros de IA y estado
+  // Filtrar conversaciones basado en filtros de IA, estado y búsqueda
   const filteredConversations = useMemo(() => {
     let filtered = [...conversations]
+
+    // Aplicar filtro de búsqueda
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase()
+      filtered = filtered.filter(conv => 
+        conv.customerName?.toLowerCase().includes(searchLower) ||
+        conv.customerPhone?.includes(searchTerm) ||
+        conv.lastMessage?.toLowerCase().includes(searchLower) ||
+        conv.aiSummary?.toLowerCase().includes(searchLower) ||
+        conv.aiSuggestion?.toLowerCase().includes(searchLower) ||
+        conv.interest?.toLowerCase().includes(searchLower) ||
+        conv.assignedAgent?.toLowerCase().includes(searchLower)
+      )
+    }
 
     // Aplicar filtros de IA
     if (selectedAIFilters.length > 0) {
@@ -85,7 +108,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     }
 
     return filtered
-  }, [conversations, selectedAIFilters, statusFilter])
+  }, [conversations, selectedAIFilters, statusFilter, searchTerm])
 
   const handleCopy = async (text: string, fieldId: string) => {
     try {
@@ -97,18 +120,72 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     }
   }
 
+  // Crear datos enriquecidos para exportación
+  const createExportData = () => {
+    const analysisResults = filteredConversations
+      .filter(conv => conv.aiSummary || conv.aiSuggestion || conv.interest || conv.salesPotential)
+      .map(conv => ({
+        id: `ai-analysis-${conv.id}`,
+        conversationId: conv.id,
+        timestamp: new Date(),
+        sentiment: {
+          score: conv.salesPotential === 'high' ? 0.8 : conv.salesPotential === 'medium' ? 0.5 : 0.2,
+          label: conv.salesPotential === 'high' ? SentimentLabel.POSITIVE : 
+                conv.salesPotential === 'medium' ? SentimentLabel.NEUTRAL : SentimentLabel.NEGATIVE,
+          confidence: 0.85,
+          keywords: conv.interest ? [conv.interest] : []
+        },
+        intent: {
+          primary: {
+            type: IntentType.GENERAL_INFO,
+            category: 'General',
+            description: conv.interest || 'Información general',
+            confidence: 0.8
+          },
+          confidence: 0.8
+        },
+        summary: conv.aiSummary || `Conversación con ${conv.customerName} - ${conv.totalMessages} mensajes`,
+        keyInsights: conv.aiSuggestion ? [conv.aiSuggestion] : ['Análisis en proceso'],
+        recommendations: conv.aiSuggestion ? [conv.aiSuggestion] : ['Seguimiento recomendado'],
+        confidence: 0.85
+      }))
+
+    return {
+      conversations: filteredConversations,
+      analysisResults,
+      metrics: dashboard?.mainMetrics,
+      dynamicMetrics: dashboard?.dynamicMetrics || [],
+      aiInsights: dashboard?.insights
+    }
+  }
+
   const handleExportExcel = async () => {
     if (filteredConversations.length === 0) return
     
     try {
-      await exportToExcel({
-        conversations: filteredConversations
-      }, {
+      const exportData = createExportData()
+      await exportToExcel(exportData, {
         includeAnalysis: true,
-        includeMetrics: false
+        includeMetrics: true,
+        includeCharts: true
       })
     } catch (error) {
       console.error('Error exportando a Excel:', error)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    if (filteredConversations.length === 0) return
+    
+    try {
+      const exportData = createExportData()
+      await exportToPDF(exportData, {
+        includeAnalysis: true,
+        includeMetrics: true,
+        includeCharts: true
+      })
+    } catch (error) {
+      console.error('Error exportando a PDF:', error)
     }
   }
 
@@ -179,17 +256,53 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     <div className={styles.analysisContainer}>
       {/* Header */}
       <div className={styles.analysisHeader}>
-        <h3 className={styles.analysisTitle}>📊 Análisis Detallado</h3>
+        <h3 className={styles.analysisTitle}>🔍 Conversaciones Analizadas</h3>
         <div className={styles.headerActions}>
+          <button
+            className={`${styles.exportButton} ${styles.pdfButton}`}
+            onClick={handleExportPDF}
+            disabled={isExporting || filteredConversations.length === 0}
+            title="Exportar a PDF"
+          >
+            📄 Exportar a PDF
+          </button>
           <button
             className={styles.exportButton}
             onClick={handleExportExcel}
             disabled={isExporting || filteredConversations.length === 0}
             title="Exportar a Excel"
           >
-            ⬇️ Exportar a Excel
+            📊 Exportar a Excel
           </button>
         </div>
+      </div>
+
+      {/* Buscador */}
+      <div className={styles.searchContainer}>
+        <div className={styles.searchInputWrapper}>
+          <span className={styles.searchIcon}>🔍</span>
+          <input
+            type="text"
+            placeholder="Buscar por cliente, teléfono, mensaje, resumen o sugerencia..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={styles.searchInput}
+          />
+          {searchTerm && (
+            <button
+              className={styles.clearSearch}
+              onClick={() => setSearchTerm('')}
+              title="Limpiar búsqueda"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        {searchTerm && (
+          <div className={styles.searchResults}>
+            Mostrando {filteredConversations.length} de {conversations.length} conversaciones
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -233,6 +346,21 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Contador de resultados */}
+      <div className={styles.resultsCount}>
+        📊 Mostrando {filteredConversations.length} de {conversations.length} conversaciones
+        {selectedAIFilters.length > 0 && (
+          <span style={{ color: '#3b82f6', fontWeight: '500' }}>
+            {' '}(filtradas por IA)
+          </span>
+        )}
+        {searchTerm && (
+          <span style={{ color: '#059669', fontWeight: '500' }}>
+            {' '}(búsqueda activa)
+          </span>
+        )}
       </div>
 
       {/* Tabla */}

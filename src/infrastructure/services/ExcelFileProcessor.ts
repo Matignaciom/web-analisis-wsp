@@ -271,6 +271,29 @@ export class ExcelFileProcessor implements IFileProcessor {
       
       const columnMapping = this.detectColumnMapping(headers)
       console.log('🗂️ Mapeo de columnas:', columnMapping)
+      
+      // 🚨 DIAGNÓSTICO ESPECÍFICO DE PROBLEMAS
+      console.log('📊 DIAGNÓSTICO DE COLUMNAS:')
+      console.log('==========================================')
+      
+      if (columnMapping.status !== undefined) {
+        console.log(`✅ Columna de estado encontrada en posición ${columnMapping.status}: "${headers[columnMapping.status]}"`)
+      } else {
+        console.warn('🚨 PROBLEMA CRÍTICO: No se encontró columna de estado')
+        console.warn('💡 Tu Excel necesita una columna con nombre: "estado", "status", "estatus"')
+        console.warn('📝 Headers disponibles:', headers.map((h, i) => `${i}: "${h}"`).join(', '))
+        console.warn('🔧 SOLUCIÓN: Agrega una columna "estado" con valores: pendiente, activo, completado, abandonado')
+      }
+      
+      if (columnMapping.customerName === undefined) {
+        console.warn('⚠️ No se encontró columna de nombre de cliente')
+      }
+      
+      if (columnMapping.customerPhone === undefined) {
+        console.warn('⚠️ No se encontró columna de teléfono')
+      }
+      
+      console.log('==========================================')
 
       // Procesar cada fila
       for (let i = 1; i < rawData.length; i++) {
@@ -855,23 +878,15 @@ export class ExcelFileProcessor implements IFileProcessor {
         conversionRate: undefined
       }
 
-      // Buscar valores numéricos que podrían ser montos, ratings, etc.
+      // Buscar solo ratings explícitos (NO asignar valores de compra automáticamente)
       for (let i = 0; i < row.length; i++) {
         const value = this.getCellValue(row, i)
         const num = this.parseNumber(value)
-        if (num && num > 0) {
-          if (num >= 1 && num <= 5) {
-            // Podría ser rating/satisfacción
-            if (!metadata.satisfaction) {
-              metadata.satisfaction = num
-            }
-          } else if (num > 100) {
-            // Podría ser monto
-            if (!metadata.totalPurchaseValue) {
-              metadata.totalPurchaseValue = num
-            }
-          }
+        // Solo asignar satisfacción si es claramente un rating (1-5)
+        if (num && num >= 1 && num <= 5 && !metadata.satisfaction) {
+          metadata.satisfaction = num
         }
+        // NO asignar valores de compra automáticamente - deben estar en columna específica
       }
 
       const conversation: Conversation = {
@@ -888,12 +903,14 @@ export class ExcelFileProcessor implements IFileProcessor {
         metadata
       }
 
-      console.log(`✅ Conversación creada para fila ${rowNumber}:`, {
-        customerName: conversation.customerName,
-        customerPhone: conversation.customerPhone,
-        status: conversation.status,
-        startDate: conversation.startDate
-      })
+      // Solo log detallado para las primeras 3 conversaciones para verificación
+      if (rowNumber <= 3) {
+        console.log(`✅ Conversación ${rowNumber} creada:`, {
+          cliente: conversation.customerName,
+          status: conversation.status,
+          mensajes: conversation.totalMessages
+        })
+      }
 
       return conversation
     } catch (error) {
@@ -989,19 +1006,59 @@ export class ExcelFileProcessor implements IFileProcessor {
     if (!value) return ConversationStatus.PENDING
     
     const statusStr = String(value).toLowerCase().trim()
+    
     const statusMap: Record<string, ConversationStatus> = {
-      'activo': ConversationStatus.ACTIVE,
+      // Inglés
       'active': ConversationStatus.ACTIVE,
-      'completado': ConversationStatus.COMPLETED,
       'completed': ConversationStatus.COMPLETED,
-      'finalizado': ConversationStatus.COMPLETED,
-      'abandonado': ConversationStatus.ABANDONED,
       'abandoned': ConversationStatus.ABANDONED,
+      'pending': ConversationStatus.PENDING,
+      // Español  
+      'activo': ConversationStatus.ACTIVE,
+      'completado': ConversationStatus.COMPLETED,
+      'finalizado': ConversationStatus.COMPLETED,
+      'terminado': ConversationStatus.COMPLETED,
+      'cerrado': ConversationStatus.COMPLETED,
+      'vendido': ConversationStatus.COMPLETED,
+      'venta': ConversationStatus.COMPLETED,
+      'compra': ConversationStatus.COMPLETED,
+      'exitoso': ConversationStatus.COMPLETED,
+      'abandonado': ConversationStatus.ABANDONED,
+      'perdido': ConversationStatus.ABANDONED,
+      'cancelado': ConversationStatus.ABANDONED,
+      'rechazado': ConversationStatus.ABANDONED,
+      'sin_respuesta': ConversationStatus.ABANDONED,
+      'no_interesado': ConversationStatus.ABANDONED,
       'pendiente': ConversationStatus.PENDING,
-      'pending': ConversationStatus.PENDING
+      'en_proceso': ConversationStatus.ACTIVE,
+      'iniciado': ConversationStatus.ACTIVE,
+      'contactado': ConversationStatus.ACTIVE,
+      'seguimiento': ConversationStatus.ACTIVE,
+      // Variaciones comunes
+      'won': ConversationStatus.COMPLETED,
+      'lost': ConversationStatus.ABANDONED,
+      'closed': ConversationStatus.COMPLETED,
+      'open': ConversationStatus.ACTIVE,
+      'new': ConversationStatus.PENDING,
+      'qualified': ConversationStatus.ACTIVE,
+      'proposal': ConversationStatus.ACTIVE,
+      'negotiation': ConversationStatus.ACTIVE,
+      'closed-won': ConversationStatus.COMPLETED,
+      'closed-lost': ConversationStatus.ABANDONED
     }
     
-    return statusMap[statusStr] || ConversationStatus.PENDING
+    const mappedStatus = statusMap[statusStr]
+    if (mappedStatus) {
+      return mappedStatus
+    } else {
+      // Log específico para valores que claramente no son estados
+      if (statusStr.length > 50 || statusStr.includes('cliente:') || statusStr.includes('asesor:')) {
+        console.warn(`🚨 PROBLEMA DE MAPEO: La columna "estado" contiene mensajes en lugar de estados`)
+        console.warn(`💡 Tu Excel necesita una columna específica con valores como: "pendiente", "completado", "abandonado"`)
+        console.warn(`📝 Valor encontrado: "${statusStr.substring(0, 100)}..."`)
+      }
+      return ConversationStatus.PENDING
+    }
   }
 
   private parseNumber(value: any): number | undefined {
