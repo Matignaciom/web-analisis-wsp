@@ -363,22 +363,28 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     maxLength?: number,
     showFullText?: boolean
   }> = ({ text, fieldId, maxLength = 50, showFullText = false }) => {
-    const displayText = showFullText || text.length <= maxLength 
-      ? text 
-      : `${text.substring(0, maxLength)}...`
+    // Detectar si el contenido tiene advertencias de datos incompletos
+    const hasDataWarning = text.includes('[DATOS INCOMPLETOS]') || 
+                          text.includes('[SIN TELÉFONO]') || 
+                          text.includes('[SIN MENSAJES]') ||
+                          text.includes('Datos limitados') ||
+                          text.includes('Datos insuficientes')
+    
+    const displayText = showFullText ? text : (text.length > maxLength ? text.substring(0, maxLength) + '...' : text)
     const isCopied = copiedField === fieldId
     
     return (
-      <div className={styles.copyableField}>
+      <div className={`${styles.copyableField} ${hasDataWarning ? styles.incompleteData : ''}`}>
         <span className={styles.fieldText} title={text}>
           {displayText}
+          {hasDataWarning && <span className={styles.dataWarningIcon}> ⚠️</span>}
         </span>
         <button
           className={`${styles.copyButton} ${isCopied ? styles.copied : ''}`}
           onClick={() => handleCopy(text, fieldId)}
-          title={isCopied ? 'Copiado!' : 'Copiar'}
+          title={`Copiar ${fieldId}`}
         >
-          {isCopied ? '✓' : <Copy size={14} />}
+          📋
         </button>
       </div>
     )
@@ -386,25 +392,45 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
 
   return (
     <div className={styles.analysisContainer}>
-      {/* Header */}
       <div className={styles.analysisHeader}>
-        <h3 className={styles.analysisTitle}>🔍 Conversaciones Analizadas</h3>
+        <div>
+          <h2 className={styles.analysisTitle}>📊 Análisis Detallado de Conversaciones</h2>
+          
+          {/* Indicador general de calidad de datos */}
+          {(() => {
+            const incompleteConversations = filteredConversations.filter(conv => 
+              (conv.metadata as any)?.incompleteData || 
+              (conv.metadata as any)?.dataQuality?.completenessScore < 0.7
+            ).length
+            
+            if (incompleteConversations > 0) {
+              return (
+                <div className={styles.dataQualityAlert}>
+                  ⚠️ <strong>{incompleteConversations}</strong> de {filteredConversations.length} conversaciones tienen datos incompletos del archivo Excel original. 
+                  Los análisis de IA pueden requerir validación adicional.
+                </div>
+              )
+            }
+            return null
+          })()}
+        </div>
+        
         <div className={styles.headerActions}>
-          <button
-            className={`${styles.exportButton} ${styles.pdfButton}`}
-            onClick={handleExportPDF}
-            disabled={isExporting || filteredConversations.length === 0}
-            title="Exportar a PDF"
-          >
-            📄 Exportar a PDF
-          </button>
-          <button
-            className={styles.exportButton}
+          <button 
             onClick={handleExportExcel}
-            disabled={isExporting || filteredConversations.length === 0}
+            className={`${styles.exportButton} ${styles.excelButton}`}
+            disabled={isExporting}
             title="Exportar a Excel"
           >
-            📊 Exportar a Excel
+            📊 Excel
+          </button>
+          <button 
+            onClick={handleExportPDF}
+            className={`${styles.exportButton} ${styles.pdfButton}`}
+            disabled={isExporting}
+            title="Exportar a PDF"
+          >
+            📄 PDF
           </button>
         </div>
       </div>

@@ -392,4 +392,233 @@
     align-items: flex-start;
     gap: 8px;
   }
+
+  .chatContainer {
+    max-height: 300px;
+    padding: 12px;
+  }
+
+  .messageBubble {
+    max-width: 85%;
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+
+  .messageLabel {
+    font-size: 9px;
+  }
+
+  .messageTime {
+    font-size: 10px;
+  }
+}
+
+/* Estilos para chat tipo WhatsApp */
+.chatContainer {
+  background: #e5ddd5;
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 200px;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #d1d5db;
+}
+
+.chatHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.chatInfo {
+  font-size: 12px;
+  color: #667085;
+  font-weight: 500;
+}
+
+.messagesContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.messageRow {
+  display: flex;
+  width: 100%;
+}
+
+.messageRow.customer {
+  justify-content: flex-start;
+}
+
+.messageRow.agent {
+  justify-content: flex-end;
+}
+
+.messageBubble {
+  max-width: 70%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+  position: relative;
+  word-wrap: break-word;
+}
+
+.messageBubble.customer {
+  background: #ffffff;
+  color: #374151;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.messageBubble.agent {
+  background: #dcf8c6;
+  color: #374151;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.messageContent {
+  margin: 0;
+  font-style: normal;
+}
+
+.messageTime {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.messageLabel {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.messageLabel.customer {
+  color: #6366f1;
+}
+
+.messageLabel.agent {
+  color: #10b981;
+}
+
+.noMessagesState {
+  text-align: center;
+  padding: 32px 16px;
+  color: #6b7280;
+}
+
+.noMessagesState h4 {
+  margin-bottom: 8px;
+  color: #374151;
+}
+
+.copyButton {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.1);
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 10px;
+}
+
+.messageBubble:hover .copyButton {
+  opacity: 1;
+}
+
+.copyButton:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Indicadores de calidad de datos */
+.dataQualityWarning {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: #92400e;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.dataQualityScore {
+  margin-top: 8px;
+  font-weight: 600;
+  color: #d97706;
+}
+
+.aiReliabilityWarning {
+  background: #eff6ff;
+  border: 1px solid #3b82f6;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: #1e40af;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.valueWithIndicator {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dataWarning {
+  font-size: 12px;
+  color: #d97706;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.aiLimitation {
+  font-size: 11px;
+  color: #f59e0b;
+  font-weight: 500;
+  background: #fef3c7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.dataLimitationNote {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border-left: 3px solid #0ea5e9;
+  font-size: 12px;
+  color: #0c4a6e;
+  border-radius: 4px;
+}
+
+.validationNote {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef3c7;
+  border-left: 3px solid #f59e0b;
+  font-size: 12px;
+  color: #92400e;
+  border-radius: 4px;
+}
+
+.noMessageNote {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+  padding: 8px 0;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 8px;
 } 

@@ -9,6 +9,12 @@ interface ConversationModalProps {
   onClose: () => void
 }
 
+interface ChatMessage {
+  sender: 'customer' | 'agent'
+  content: string
+  time: string
+}
+
 const ConversationModal: React.FC<ConversationModalProps> = ({
   conversation,
   isOpen,
@@ -60,6 +66,90 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
     return colors[potential as keyof typeof colors] || '#6b7280'
   }
 
+  const parseWhatsAppMessages = (messageText: string): ChatMessage[] => {
+    const messages: ChatMessage[] = []
+    
+    // Dividir por líneas y filtrar líneas vacías
+    const lines = messageText.split('\n').filter(line => line.trim())
+    
+    for (const line of lines) {
+      // Limpiar la línea
+      const cleanLine = line.trim()
+      if (!cleanLine) continue
+      
+      // Buscar patrón: - [timestamp] Rol: mensaje
+      // o simplemente: - Rol: mensaje
+      const timeStampMatch = cleanLine.match(/^-\s*(\d{4}-\d{2}-\d{2}T[\d:.]+Z)?\s*(Cliente|Asesor Comercial):\s*(.+)$/)
+      
+      if (timeStampMatch) {
+        const [, timestamp, role, content] = timeStampMatch
+        
+        // Determinar el sender
+        const sender = role.toLowerCase().includes('cliente') ? 'customer' : 'agent'
+        
+        // Formatear timestamp
+        let time = ''
+        if (timestamp) {
+          try {
+            const date = new Date(timestamp)
+            time = formatDate(date)
+          } catch {
+            time = new Date().toLocaleTimeString('es-ES', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            })
+          }
+        } else {
+          time = new Date().toLocaleTimeString('es-ES', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })
+        }
+        
+        // Limpiar contenido de mensajes especiales
+        let cleanContent = content.trim()
+        
+        // Detectar mensajes de imagen/audio y formatearlos mejor
+        if (cleanContent.includes('<image>')) {
+          cleanContent = '📷 ' + cleanContent.replace('<image>', '').replace('</image>', '')
+        } else if (cleanContent.includes('<audio>')) {
+          cleanContent = '🎵 ' + cleanContent.replace('<audio>', '').replace('</audio>', '')
+        }
+        
+        messages.push({
+          sender,
+          content: cleanContent,
+          time
+        })
+      }
+    }
+    
+    return messages
+  }
+
+  const generateChatMessages = (conversation: Conversation): ChatMessage[] => {
+    // Si no hay mensajes reales, retornamos array vacío
+    if (conversation.lastMessage.includes('[SIN MENSAJES EN DATOS ORIGINALES]')) {
+      return []
+    }
+
+    // Intentar parsear los mensajes de WhatsApp del formato que viene del Excel
+    const parsedMessages = parseWhatsAppMessages(conversation.lastMessage)
+    
+    // Si se parsearon mensajes exitosamente, usarlos
+    if (parsedMessages.length > 0) {
+      // Limitar a los últimos 10 mensajes para no sobrecargar la interfaz
+      return parsedMessages.slice(-10)
+    }
+    
+    // Si no se pudo parsear, mostrar como mensaje único (fallback)
+    return [{
+      sender: 'customer',
+      content: conversation.lastMessage,
+      time: formatDate(conversation.startDate)
+    }]
+  }
+
   return (
     <div className={styles.modalOverlay} onClick={handleBackdropClick}>
       <div className={styles.modalContent}>
@@ -82,14 +172,43 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
           {/* Información básica */}
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>📋 Información Básica</h3>
+            
+            {/* Indicador de calidad de datos */}
+            {((conversation.metadata as any)?.incompleteData || 
+              (conversation.metadata as any)?.dataQuality?.completenessScore < 0.7) && (
+              <div className={styles.dataQualityWarning}>
+                ⚠️ <strong>Advertencia:</strong> Los datos de esta conversación son incompletos según el archivo Excel original. 
+                Se recomienda validar la información antes de proceder.
+                {(conversation.metadata as any)?.dataQuality && (
+                  <div className={styles.dataQualityScore}>
+                    Completitud de datos: {Math.round((conversation.metadata as any).dataQuality.completenessScore * 100)}%
+                  </div>
+                )}
+              </div>
+            )}
+            
             <div className={styles.infoGrid}>
               <div className={styles.infoItem}>
                 <span className={styles.label}>Cliente:</span>
-                <span className={styles.value}>{conversation.customerName}</span>
+                <div className={styles.valueWithIndicator}>
+                  <span className={styles.value}>
+                    {conversation.customerName}
+                    {conversation.customerName.includes('[DATOS INCOMPLETOS]') && (
+                      <span className={styles.dataWarning}> (Nombre no disponible en archivo original)</span>
+                    )}
+                  </span>
+                </div>
               </div>
               <div className={styles.infoItem}>
                 <span className={styles.label}>Teléfono:</span>
-                <span className={styles.value}>{conversation.customerPhone}</span>
+                <div className={styles.valueWithIndicator}>
+                  <span className={styles.value}>
+                    {conversation.customerPhone}
+                    {conversation.customerPhone.includes('[SIN TELÉFONO EN DATOS ORIGINALES]') && (
+                      <span className={styles.dataWarning}> (Teléfono no disponible en archivo original)</span>
+                    )}
+                  </span>
+                </div>
               </div>
               <div className={styles.infoItem}>
                 <span className={styles.label}>Estado:</span>
@@ -118,12 +237,25 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
           {/* Análisis de IA */}
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>🤖 Análisis de IA</h3>
+            
+            {/* Indicador de confiabilidad del análisis */}
+            {((conversation.metadata as any)?.incompleteData || 
+              (conversation.metadata as any)?.dataQuality?.completenessScore < 0.5) && (
+              <div className={styles.aiReliabilityWarning}>
+                🔍 <strong>Nota:</strong> Este análisis de IA está basado en datos limitados del archivo Excel. 
+                Los resultados pueden requerir validación adicional.
+              </div>
+            )}
+            
             <div className={styles.aiAnalysis}>
               <div className={styles.aiItem}>
                 <span className={styles.aiLabel}>💡 Interés del Cliente:</span>
                 <div className={styles.aiContentBox}>
                   <p className={styles.aiValue}>
-                    {conversation.interest || 'No identificado'}
+                    {conversation.interest || 'Analizando...'}
+                    {conversation.interest?.includes('Datos insuficientes') && (
+                      <span className={styles.aiLimitation}> (Basado en datos limitados)</span>
+                    )}
                   </p>
                   {conversation.interest && (
                     <button
@@ -147,7 +279,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                   className={styles.potentialBadge}
                   style={{ backgroundColor: getSalesPotentialColor(conversation.salesPotential) }}
                 >
-                  {conversation.salesPotential?.toUpperCase() || 'NO EVALUADO'}
+                  {conversation.salesPotential?.toUpperCase() || 'EVALUANDO...'}
                 </span>
               </div>
               
@@ -156,6 +288,11 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                 <div className={styles.aiContentBox}>
                   <div className={styles.expandedAiText}>
                     {conversation.aiSummary || '🤖 Generando resumen...'}
+                    {conversation.aiSummary?.includes('Datos limitados') && (
+                      <div className={styles.dataLimitationNote}>
+                        📊 Este resumen está basado en la información disponible en el archivo Excel original.
+                      </div>
+                    )}
                   </div>
                   {conversation.aiSummary && (
                     <button
@@ -178,6 +315,11 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                 <div className={styles.aiContentBox}>
                   <div className={styles.expandedAiText}>
                     {conversation.aiSuggestion || '💡 Analizando y generando sugerencia...'}
+                    {conversation.aiSuggestion?.includes('Validar y completar') && (
+                      <div className={styles.validationNote}>
+                        ⚠️ Se recomienda validar los datos del cliente antes de proceder con acciones comerciales.
+                      </div>
+                    )}
                   </div>
                   {conversation.aiSuggestion && (
                     <button
@@ -197,29 +339,61 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
             </div>
           </div>
 
-          {/* Último mensaje */}
+          {/* Chat Conversación */}
           <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>💬 Último Mensaje</h3>
-            <div className={styles.messageBox}>
-              <div className={styles.messageHeader}>
-                <span className={styles.messageInfo}>
-                  📅 {formatDate(conversation.startDate)}
+            <h3 className={styles.sectionTitle}>💬 Conversación</h3>
+            <div className={styles.chatContainer}>
+              <div className={styles.chatHeader}>
+                <span className={styles.chatInfo}>
+                  📅 {formatDate(conversation.startDate)} • {conversation.totalMessages} mensajes
                 </span>
                 <button
                   className={styles.copyIconButton}
                   onClick={() => {
                     navigator.clipboard.writeText(conversation.lastMessage)
-                      .then(() => alert('✅ Mensaje copiado'))
+                      .then(() => alert('✅ Conversación copiada'))
                       .catch(() => alert('❌ Error al copiar'))
                   }}
-                  title="Copiar mensaje"
+                  title="Copiar conversación"
                 >
                   <Copy size={14} />
                 </button>
               </div>
-              <p className={styles.messageContent}>
-                "{conversation.lastMessage}"
-              </p>
+              
+              {conversation.lastMessage.includes('[SIN MENSAJES EN DATOS ORIGINALES]') ? (
+                <div className={styles.noMessagesState}>
+                  <h4>📝 Sin mensajes disponibles</h4>
+                  <p>No se encontraron mensajes en el archivo Excel original para esta conversación.</p>
+                </div>
+              ) : (
+                <div className={styles.messagesContainer}>
+                  {/* Simulamos mensajes basados en el análisis de IA y datos disponibles */}
+                  {generateChatMessages(conversation).map((message, index) => (
+                    <div key={index} className={`${styles.messageRow} ${styles[message.sender]}`}>
+                      <div className={`${styles.messageBubble} ${styles[message.sender]}`}>
+                        <div className={`${styles.messageLabel} ${styles[message.sender]}`}>
+                          {message.sender === 'customer' ? '👤 Cliente' : '💬 Recepción'}
+                        </div>
+                        <p className={styles.messageContent}>{message.content}</p>
+                        <div className={styles.messageTime}>
+                          {message.time}
+                        </div>
+                        <button
+                          className={styles.copyButton}
+                          onClick={() => {
+                            navigator.clipboard.writeText(message.content)
+                              .then(() => alert('✅ Mensaje copiado'))
+                              .catch(() => alert('❌ Error al copiar'))
+                          }}
+                          title="Copiar mensaje"
+                        >
+                          📋
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

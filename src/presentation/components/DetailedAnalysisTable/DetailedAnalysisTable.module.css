@@ -412,10 +412,15 @@
 }
 
 .copyableField {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 4px;
-  max-width: 100%;
+  gap: 8px;
+  padding: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .fieldText {
@@ -709,4 +714,31 @@
   50% {
     opacity: 0.5;
   }
+}
+
+/* Indicadores de calidad de datos */
+.dataQualityAlert {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 16px 0;
+  color: #92400e;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.incompleteData {
+  background: #fef9e7 !important;
+  border-left: 3px solid #f59e0b !important;
+}
+
+.dataWarningIcon {
+  color: #f59e0b;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.incompleteData .fieldText {
+  color: #92400e !important;
 } 

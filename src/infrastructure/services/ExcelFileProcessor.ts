@@ -5,11 +5,8 @@ import type {
   ProcessResult,
   ProcessError
 } from '@/domain/interfaces/IFileProcessor'
-import type { 
-  Conversation, 
-  ConversationMetadata 
-} from '@/domain/entities'
-import { ConversationStatus } from '@/domain/entities'
+import type { Conversation } from '@/domain/entities/Conversation'
+import { ConversationStatus } from '@/domain/entities/Conversation'
 
 export class ExcelFileProcessor implements IFileProcessor {
   private readonly supportedFormats = ['.xlsx', '.xls', '.csv']
@@ -680,7 +677,7 @@ export class ExcelFileProcessor implements IFileProcessor {
         return String(value)
       }
       
-      // Obtener nombre del cliente (requerido)
+      // Obtener nombre del cliente (requerido) - SOLO DATOS REALES
       let customerName = this.getCellValue(row, columnMapping.customerName)
       
       // Convertir a string de forma segura y validar
@@ -688,7 +685,7 @@ export class ExcelFileProcessor implements IFileProcessor {
         customerName = safeStringConvert(customerName).trim()
       }
       
-      // Si no tenemos nombre mapeado, buscar en las primeras columnas cualquier texto válido
+      // Si no tenemos nombre mapeado, buscar en las primeras columnas SOLO texto válido real
       if (!customerName && row.length > 0) {
         for (let i = 0; i < Math.min(4, row.length); i++) {
           const value = this.getCellValue(row, i)
@@ -696,26 +693,28 @@ export class ExcelFileProcessor implements IFileProcessor {
             const stringValue = safeStringConvert(value).trim()
             if (stringValue.length > 1 && 
                 !stringValue.match(/^\d+$/) && 
-                !this.looksLikeDate(value) && // Evitar fechas como nombres
-                !stringValue.match(/^\d{4}-\d{2}-\d{2}/) && // Evitar formatos de fecha ISO
-                !stringValue.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) && // Evitar dd/mm/yyyy
-                !stringValue.match(/^\d{1,2}-\d{1,2}-\d{4}/) && // Evitar dd-mm-yyyy
-                !stringValue.match(/^[\d\s\-\+\(\)]{8,}$/)) { // Evitar teléfonos
+                !this.looksLikeDate(value) && 
+                !stringValue.match(/^\d{4}-\d{2}-\d{2}/) && 
+                !stringValue.match(/^\d{1,2}\/\d{1,2}\/\d{4}/) && 
+                !stringValue.match(/^\d{1,2}-\d{1,2}-\d{4}/) && 
+                !stringValue.match(/^[\d\s\-\+\(\)]{8,}$/)) {
               customerName = stringValue
-              console.log(`🔧 Usando "${customerName}" como nombre del cliente (columna ${i})`)
+              console.log(`✅ Nombre del cliente encontrado en columna ${i}: "${customerName}"`)
               break
             }
           }
         }
       }
       
-      // Si aún no tenemos nombre válido, generar uno más descriptivo
+      // CRÍTICO: Si NO hay nombre real, marcar claramente como datos incompletos
+      let isDataIncomplete = false
       if (!customerName || customerName.trim() === '') {
-        customerName = `Cliente Sin Nombre #${rowNumber}`
-        console.log(`🔧 Generando nombre por defecto: "${customerName}"`)
+        customerName = `[DATOS INCOMPLETOS] Fila ${rowNumber}`
+        isDataIncomplete = true
+        console.warn(`⚠️ Sin nombre válido en fila ${rowNumber} - marcando como datos incompletos`)
       }
       
-      // Obtener teléfono del cliente (requerido)
+      // Obtener teléfono del cliente - SOLO DATOS REALES
       let customerPhone = this.getCellValue(row, columnMapping.customerPhone)
       
       // Convertir a string de forma segura
@@ -723,7 +722,7 @@ export class ExcelFileProcessor implements IFileProcessor {
         customerPhone = safeStringConvert(customerPhone)
       }
       
-      // Si no tenemos teléfono mapeado, buscar cualquier valor que parezca un número
+      // Si no tenemos teléfono mapeado, buscar SOLO números reales
       if (!customerPhone && row.length > 0) {
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
@@ -731,31 +730,30 @@ export class ExcelFileProcessor implements IFileProcessor {
             const stringValue = safeStringConvert(value)
             if (typeof value === 'number' || 
                 (stringValue && (
-                  stringValue.match(/[\d+()-\s]{8,}/) || // Números con al menos 8 dígitos
-                  stringValue.match(/^\+?[\d\s()-]{10,}$/) || // Formato teléfono
-                  stringValue.match(/^\d{10,}$/) // Solo números largos
+                  stringValue.match(/[\d+()-\s]{8,}/) || 
+                  stringValue.match(/^\+?[\d\s()-]{10,}$/) || 
+                  stringValue.match(/^\d{10,}$/)
                 ))) {
               customerPhone = stringValue
-              console.log(`🔧 Usando "${customerPhone}" como teléfono (columna ${i})`)
+              console.log(`✅ Teléfono encontrado en columna ${i}: "${customerPhone}"`)
               break
             }
           }
         }
       }
       
-      // Si aún no tenemos teléfono, generar uno inteligente
+      // CRÍTICO: Si NO hay teléfono real, marcar como datos incompletos
       if (!customerPhone) {
-        // Generar número mexicano válido con formato WhatsApp
-        const areaCode = ['55', '33', '81', '222', '442', '618'][Math.floor(Math.random() * 6)]
-        const number = Math.floor(1000000 + Math.random() * 9000000)
-        customerPhone = `+521${areaCode}${number}`
-        console.log(`🤖 IA generando teléfono válido: "${customerPhone}" (Área: ${areaCode})`)
+        customerPhone = '[SIN TELÉFONO EN DATOS ORIGINALES]'
+        isDataIncomplete = true
+        console.warn(`⚠️ Sin teléfono válido en fila ${rowNumber} - usando marcador de datos incompletos`)
       }
       
-      // Parsear fecha con múltiples estrategias
-      let startDate: Date = new Date() // Default fallback
+      // Parsear fecha con estrategias basadas en datos reales
+      let startDate: Date = new Date()
+      let hasRealDate = false
       
-      // Intentar obtener fecha de la columna mapeada
+      // Intentar obtener fecha REAL de la columna mapeada
       if (columnMapping.startDate !== undefined) {
         const dateValue = this.getCellValue(row, columnMapping.startDate)
         if (dateValue) {
@@ -763,16 +761,17 @@ export class ExcelFileProcessor implements IFileProcessor {
             const parsedDate = this.parseDate(dateValue)
             if (parsedDate && !isNaN(parsedDate.getTime())) {
               startDate = parsedDate
-              console.log(`✅ Fecha parseada desde columna mapeada: ${startDate}`)
+              hasRealDate = true
+              console.log(`✅ Fecha real parseada: ${startDate}`)
             }
           } catch (error) {
-            console.warn(`⚠️ Error parseando fecha mapeada:`, error)
+            console.warn(`⚠️ Error parseando fecha:`, error)
           }
         }
       }
       
-      // Si no obtuvimos fecha válida, buscar en todas las columnas
-      if (startDate.getTime() === new Date().getTime() || isNaN(startDate.getTime())) {
+      // Buscar fecha real en todas las columnas
+      if (!hasRealDate) {
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
           if (value && this.looksLikeDate(value)) {
@@ -780,7 +779,8 @@ export class ExcelFileProcessor implements IFileProcessor {
               const parsedDate = this.parseDate(value)
               if (parsedDate && !isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 2000) {
                 startDate = parsedDate
-                console.log(`🔧 Fecha encontrada en columna ${i}: ${startDate}`)
+                hasRealDate = true
+                console.log(`✅ Fecha real encontrada en columna ${i}: ${startDate}`)
                 break
               }
             } catch (e) {
@@ -790,59 +790,73 @@ export class ExcelFileProcessor implements IFileProcessor {
         }
       }
 
-      // Parsear estado con flexibilidad
-      let status = ConversationStatus.PENDING // Default
+      // Parsear estado basado en datos reales
+      let status = ConversationStatus.PENDING
+      let hasRealStatus = false
       const statusValue = this.getCellValue(row, columnMapping.status)
       
       if (statusValue) {
-        status = this.parseStatus(statusValue)
+        const parsedStatus = this.parseStatus(statusValue)
+        if (parsedStatus !== ConversationStatus.PENDING) {
+          status = parsedStatus
+          hasRealStatus = true
+          console.log(`✅ Estado real encontrado: ${status}`)
+        }
       } else {
-        // Buscar en cualquier columna un valor que parezca estado
+        // Buscar estado real en cualquier columna
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
           if (value && typeof value === 'string') {
             const statusCandidate = this.parseStatus(value)
             if (statusCandidate !== ConversationStatus.PENDING) {
               status = statusCandidate
-              console.log(`🔧 Estado encontrado en columna ${i}: ${status}`)
+              hasRealStatus = true
+              console.log(`✅ Estado real encontrado en columna ${i}: ${status}`)
               break
             }
           }
         }
       }
 
-      // Obtener número de mensajes
-      let totalMessages = 1 // Default
+      // Obtener número de mensajes REALES
+      let totalMessages = 1
+      let hasRealMessageCount = false
       const messagesValue = this.getCellValue(row, columnMapping.totalMessages)
       if (messagesValue) {
         const parsed = this.parseNumber(messagesValue)
         if (parsed && parsed > 0) {
           totalMessages = parsed
+          hasRealMessageCount = true
+          console.log(`✅ Cantidad real de mensajes: ${totalMessages}`)
         }
       } else {
-        // Buscar cualquier número que pueda ser cantidad de mensajes
+        // Buscar número real de mensajes
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
           const num = this.parseNumber(value)
-          if (num && num > 0 && num < 1000) { // Rango razonable para mensajes
+          if (num && num > 0 && num < 1000) {
             totalMessages = num
-            console.log(`🔧 Cantidad de mensajes encontrada en columna ${i}: ${totalMessages}`)
+            hasRealMessageCount = true
+            console.log(`✅ Cantidad real de mensajes encontrada en columna ${i}: ${totalMessages}`)
             break
           }
         }
       }
 
-      // Obtener último mensaje
-      let lastMessage = 'No se ha iniciado conversación'
+      // Obtener último mensaje REAL
+      let lastMessage = '[SIN MENSAJES EN DATOS ORIGINALES]'
+      let hasRealMessage = false
       const lastMessageValue = this.getCellValue(row, columnMapping.lastMessage)
       
       if (lastMessageValue && lastMessageValue !== null && lastMessageValue !== undefined) {
         const safeMessage = safeStringConvert(lastMessageValue).trim()
         if (safeMessage.length > 0) {
           lastMessage = safeMessage
+          hasRealMessage = true
+          console.log(`✅ Mensaje real encontrado: "${lastMessage.substring(0, 50)}..."`)
         }
       } else {
-        // Buscar cualquier columna con texto que pueda ser un mensaje
+        // Buscar mensaje real en cualquier columna
         for (let i = 0; i < row.length; i++) {
           const value = this.getCellValue(row, i)
           if (value && value !== null && value !== undefined) {
@@ -852,91 +866,72 @@ export class ExcelFileProcessor implements IFileProcessor {
                 !this.looksLikeDate(value) && 
                 !stringValue.match(/^\d+$/)) {
               lastMessage = stringValue.trim()
-              console.log(`🔧 Último mensaje encontrado en columna ${i}: "${lastMessage.substring(0, 50)}..."`)
+              hasRealMessage = true
+              console.log(`✅ Mensaje real encontrado en columna ${i}: "${lastMessage.substring(0, 50)}..."`)
               break
             }
           }
         }
       }
 
-      // Obtener agente asignado
+      // Obtener agente asignado REAL
       let assignedAgent: string | undefined
+      let hasRealAgent = false
       const agentValue = this.getCellValue(row, columnMapping.assignedAgent)
+      
       if (agentValue && agentValue !== null && agentValue !== undefined) {
         const safeAgent = safeStringConvert(agentValue).trim()
-        if (safeAgent.length > 0) {
+        if (safeAgent.length > 0 && safeAgent !== customerName && !this.looksLikeDate(agentValue)) {
           assignedAgent = safeAgent
+          hasRealAgent = true
+          console.log(`✅ Agente real asignado: "${assignedAgent}"`)
         }
       }
 
-      // Metadatos flexibles
-      const metadata: ConversationMetadata = {
-        source: 'Excel Import',
-        responseTime: 0,
-        satisfaction: undefined,
-        totalPurchaseValue: undefined,
-        conversionRate: undefined
+      // Marcar calidad de datos para análisis de IA posterior
+      const dataQuality = {
+        hasRealName: !isDataIncomplete,
+        hasRealPhone: customerPhone !== '[SIN TELÉFONO EN DATOS ORIGINALES]',
+        hasRealDate,
+        hasRealStatus,
+        hasRealMessageCount,
+        hasRealMessage,
+        hasRealAgent,
+        completenessScore: [
+          !isDataIncomplete, 
+          customerPhone !== '[SIN TELÉFONO EN DATOS ORIGINALES]',
+          hasRealDate, 
+          hasRealStatus, 
+          hasRealMessage
+        ].filter(Boolean).length / 5
       }
 
-      // Buscar solo ratings explícitos (NO asignar valores de compra automáticamente)
-      for (let i = 0; i < row.length; i++) {
-        const value = this.getCellValue(row, i)
-        const num = this.parseNumber(value)
-        // Solo asignar satisfacción si es claramente un rating (1-5)
-        if (num && num >= 1 && num <= 5 && !metadata.satisfaction) {
-          metadata.satisfaction = num
-        }
-        // NO asignar valores de compra automáticamente - deben estar en columna específica
-      }
-
-      const conversation: Conversation = {
-        id: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        customerName: safeStringConvert(customerName).trim(),
-        customerPhone: this.formatPhoneNumber(safeStringConvert(customerPhone)),
+      // Crear conversación con datos REALES únicamente
+      const conversation: Omit<Conversation, 'id'> = {
+        customerName,
+        customerPhone: this.formatPhoneNumber(customerPhone),
         startDate,
-        endDate: undefined, // Se puede agregar lógica para fecha fin si es necesario
         status,
         totalMessages,
-        lastMessage: safeStringConvert(lastMessage).trim(),
+        lastMessage,
         assignedAgent,
-        tags: [], // Se pueden agregar tags basados en análisis
-        metadata
-      }
-
-      // Solo log detallado para las primeras 3 conversaciones para verificación
-      if (rowNumber <= 3) {
-        console.log(`✅ Conversación ${rowNumber} creada:`, {
-          cliente: conversation.customerName,
-          status: conversation.status,
-          mensajes: conversation.totalMessages
-        })
-      }
-
-      return conversation
-    } catch (error) {
-      console.warn(`❌ Error procesando fila ${rowNumber}:`, error)
-      // En lugar de devolver null, intentar crear una conversación mínima
-      try {
-        const fallbackConversation: Conversation = {
-          id: `conv_error_${Date.now()}_${rowNumber}`,
-          customerName: `Cliente_${rowNumber}`,
-          customerPhone: `+52${Math.floor(1000000000 + Math.random() * 9000000000)}`,
-          startDate: new Date(),
-          status: ConversationStatus.PENDING,
-          totalMessages: 1,
-          lastMessage: 'Error al procesar mensaje original',
-          tags: ['error_import'],
-          metadata: {
-            source: 'Excel Import (Error Recovery)',
-            responseTime: 0
-          }
+        tags: [], // Solo etiquetas basadas en datos reales, no inventadas
+        metadata: {
+          source: 'excel_import',
+          responseTime: hasRealMessageCount ? Math.max(1, totalMessages * 15) : 0,
+          dataQuality, // NUEVO: incluir información sobre calidad de datos
+          originalRowNumber: rowNumber,
+          incompleteData: isDataIncomplete
         }
-        console.log(`🔧 Conversación de respaldo creada para fila ${rowNumber}`)
-        return fallbackConversation
-      } catch (fallbackError) {
-        console.error(`💥 Error creando conversación de respaldo para fila ${rowNumber}:`, fallbackError)
-        return null
       }
+
+      console.log(`${isDataIncomplete ? '⚠️' : '✅'} Conversación ${isDataIncomplete ? 'con datos incompletos' : 'procesada'}: ${customerName}`)
+      
+      return conversation as Conversation
+      
+    } catch (error) {
+      console.error(`❌ Error procesando fila ${rowNumber}:`, error)
+      return null
     }
   }
 

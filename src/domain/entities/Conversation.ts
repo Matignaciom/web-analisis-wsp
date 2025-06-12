@@ -29,6 +29,18 @@ export interface ConversationMetadata {
   satisfaction?: number // 1-5
   totalPurchaseValue?: number
   conversionRate?: number
+  dataQuality?: {
+    hasRealName: boolean
+    hasRealPhone: boolean
+    hasRealDate: boolean
+    hasRealStatus: boolean
+    hasRealMessageCount: boolean
+    hasRealMessage: boolean
+    hasRealAgent: boolean
+    completenessScore: number
+  }
+  originalRowNumber?: number
+  incompleteData?: boolean
 }
 
 export interface ConversationFilters {

@@ -285,52 +285,94 @@ Proporciona un análisis en este formato JSON exacto:
 
   async generateConversationSummary(conversation: Conversation): Promise<string> {
     try {
-      // Verificar si no hay mensajes suficientes
-      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      // Verificar calidad de datos antes de generar análisis
+      const dataQuality = (conversation.metadata as any)?.dataQuality
+      const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
       
-      if (hasNoMessages) {
-        return `No hay mensajes registrados para analizar. Conversación con ${conversation.customerName} está marcada como ${conversation.status === 'pending' ? 'pendiente' : conversation.status}.`
+      // Si los datos son incompletos, generar resumen basado en lo disponible
+      if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+        return `⚠️ Datos limitados: ${conversation.customerName}. Información incompleta en archivo original. Se requiere validación manual.`
       }
       
+      // Verificar si hay mensajes suficientes para análisis
+      const hasNoMessages = conversation.totalMessages <= 1 && 
+        (conversation.lastMessage === '[SIN MENSAJES EN DATOS ORIGINALES]' || 
+         conversation.lastMessage === 'No se ha iniciado conversación')
+      
+      if (hasNoMessages) {
+        return `📋 Cliente: ${conversation.customerName}. Sin historial de mensajes en datos originales. Estado actual: ${conversation.status}. Requiere contacto inicial.`
+      }
+      
+      // Solo usar IA si hay datos reales suficientes
       const response = await this.openai.chat.completions.create({
         model: this.model,
         messages: [
           {
             role: 'system',
-            content: 'Eres un asistente especializado en resumir conversaciones de servicio al cliente. Genera resúmenes concisos y útiles.'
+            content: `Eres un asistente especializado en resumir conversaciones de servicio al cliente basándote ÚNICAMENTE en los datos reales proporcionados. 
+            NO inventes ni asumas información que no esté explícitamente en los datos. 
+            Si los datos son limitados, indica claramente esta limitación.`
           },
           {
             role: 'user',
-            content: `Resume esta conversación de WhatsApp de manera concisa:
+            content: `Analiza esta conversación basándote SOLO en los datos reales del archivo Excel:
 
-**Cliente:** ${conversation.customerName}
-**Teléfono:** ${conversation.customerPhone}
-**Estado:** ${conversation.status}
-**Total mensajes:** ${conversation.totalMessages}
-**Último mensaje:** ${conversation.lastMessage}
-**Agente:** ${conversation.assignedAgent || 'No asignado'}
+**DATOS REALES DISPONIBLES:**
+- Cliente: ${conversation.customerName}
+- Teléfono: ${conversation.customerPhone}
+- Estado en datos: ${conversation.status}
+- Total mensajes registrados: ${conversation.totalMessages}
+- Último mensaje registrado: "${conversation.lastMessage}"
+- Agente asignado: ${conversation.assignedAgent || 'No especificado'}
+- Fecha: ${conversation.startDate.toLocaleDateString()}
 
-Genera un resumen de máximo 100 caracteres que capture la esencia de la conversación.`
+**CALIDAD DE DATOS:**
+${dataQuality ? `- Completitud: ${Math.round(dataQuality.completenessScore * 100)}%
+- Nombre real: ${dataQuality.hasRealName ? 'Sí' : 'No'}
+- Teléfono real: ${dataQuality.hasRealPhone ? 'Sí' : 'No'}
+- Mensajes reales: ${dataQuality.hasRealMessage ? 'Sí' : 'No'}` : 'No disponible'}
+
+Genera un resumen de máximo 120 caracteres basándote ÚNICAMENTE en estos datos reales. No agregues información especulativa.`
           }
         ],
-        temperature: 0.4,
+        temperature: 0.2, // Muy baja para ser más conservador
         max_tokens: 150
       })
 
-      return response.choices[0].message.content?.trim() || 'Resumen no disponible'
+      const summary = response.choices[0].message.content?.trim() || 'Resumen no disponible'
+      
+      // Validar que el resumen no contenga información inventada
+      if (summary.includes('quiere comprar') || summary.includes('interesado en') || 
+          summary.includes('negociación') || summary.includes('precio de')) {
+        // Si el resumen parece especulativo, usar versión conservadora
+        return `📋 ${conversation.customerName} - Estado: ${conversation.status}. ${conversation.totalMessages} mensajes. Último: "${conversation.lastMessage.substring(0, 40)}..."`
+      }
+      
+      return summary
     } catch (error) {
       console.error('Error generando resumen:', error)
-      return `${conversation.status === 'completed' ? 'Cliente contactado' : 'Conversación'} con ${conversation.customerName}`
+      return `📋 ${conversation.customerName} - Estado: ${conversation.status} (${conversation.totalMessages} mensajes registrados)`
     }
   }
 
   async generateConversationSuggestion(conversation: Conversation): Promise<string> {
     try {
-      // Verificar si no hay mensajes suficientes
-      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      // Verificar calidad de datos
+      const dataQuality = (conversation.metadata as any)?.dataQuality
+      const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+      
+      // Si los datos son incompletos, sugerir validación
+      if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+        return 'Validar y completar información del cliente antes de iniciar seguimiento comercial'
+      }
+      
+      // Verificar si hay mensajes reales
+      const hasNoMessages = conversation.totalMessages <= 1 && 
+        (conversation.lastMessage === '[SIN MENSAJES EN DATOS ORIGINALES]' || 
+         conversation.lastMessage === 'No se ha iniciado conversación')
       
       if (hasNoMessages) {
-        return 'Enviar mensaje inicial personalizado para iniciar conversación'
+        return 'Enviar mensaje inicial personalizado para establecer primer contacto'
       }
       
       const response = await this.openai.chat.completions.create({
@@ -338,134 +380,193 @@ Genera un resumen de máximo 100 caracteres que capture la esencia de la convers
         messages: [
           {
             role: 'system',
-            content: 'Eres un consultor de ventas experto. Genera sugerencias específicas y accionables para seguimiento de clientes.'
+            content: `Eres un consultor de ventas que sugiere acciones basándose ÚNICAMENTE en datos reales disponibles. 
+            NO hagas suposiciones sobre intenciones de compra o intereses específicos que no estén claramente evidenciados en los datos.
+            Enfócate en acciones prácticas basadas en el estado actual y los datos disponibles.`
           },
           {
             role: 'user',
-            content: `Basándote en esta conversación, sugiere la mejor acción de seguimiento:
+            content: `Basándote ÚNICAMENTE en estos datos reales, sugiere la próxima acción:
 
-**Cliente:** ${conversation.customerName}
-**Estado:** ${conversation.status}
-**Total mensajes:** ${conversation.totalMessages}
-**Último mensaje:** ${conversation.lastMessage}
-**Fecha:** ${conversation.startDate.toLocaleDateString()}
+**DATOS DEL ARCHIVO EXCEL:**
+- Cliente: ${conversation.customerName}
+- Estado documentado: ${conversation.status}
+- Mensajes registrados: ${conversation.totalMessages}
+- Último mensaje: "${conversation.lastMessage}"
+- Fecha: ${conversation.startDate.toLocaleDateString()}
+- Agente: ${conversation.assignedAgent || 'Sin asignar'}
 
-Genera UNA sugerencia específica de máximo 120 caracteres para el próximo contacto o acción.`
+**CALIDAD DE DATOS:**
+${dataQuality ? `Completitud: ${Math.round(dataQuality.completenessScore * 100)}%` : 'No evaluada'}
+
+Sugiere UNA acción específica de máximo 100 caracteres basada SOLO en estos datos, sin especular sobre intenciones no evidenciadas.`
           }
         ],
-        temperature: 0.5,
-        max_tokens: 200
+        temperature: 0.3,
+        max_tokens: 150
       })
 
-      return response.choices[0].message.content?.trim() || 'Realizar seguimiento personalizado'
+      const suggestion = response.choices[0].message.content?.trim() || 'Realizar seguimiento según protocolo estándar'
+      
+      // Validar que la sugerencia no sea especulativa
+      if (suggestion.includes('está interesado') || suggestion.includes('quiere comprar') || 
+          suggestion.includes('necesita') || suggestion.includes('busca')) {
+        // Usar sugerencia conservadora basada en el estado
+        switch (conversation.status) {
+          case 'completed':
+            return 'Solicitar feedback sobre el servicio recibido'
+          case 'abandoned':
+            return 'Contactar para verificar satisfacción y ofrecer asistencia'
+          case 'pending':
+            return 'Asignar agente y responder según protocolo establecido'
+          case 'active':
+            return 'Continuar seguimiento según historial de mensajes'
+          default:
+            return 'Revisar caso y definir siguiente acción según contexto'
+        }
+      }
+      
+      return suggestion
     } catch (error) {
       console.error('Error generando sugerencia:', error)
       
-      // Sugerencias de respaldo basadas en el estado
+      // Sugerencias conservadoras basadas solo en el estado
       switch (conversation.status) {
         case 'completed':
-          return 'Solicitar feedback y ofertas complementarias'
+          return 'Solicitar feedback y evaluar oportunidades adicionales'
         case 'abandoned':
-          return 'Contactar con oferta especial o descuento'
+          return 'Reactivar contacto con oferta de asistencia'
         case 'pending':
-          return 'Responder rápidamente y agendar llamada'
+          return 'Asignar agente y proceder según protocolo'
         case 'active':
-          return 'Mantener seguimiento activo y cerrar venta'
+          return 'Continuar seguimiento activo y documentar progreso'
         default:
-          return 'Realizar seguimiento personalizado según contexto'
+          return 'Evaluar caso y definir estrategia de seguimiento'
       }
     }
   }
 
   async generateInterest(conversation: Conversation): Promise<string> {
     try {
-      // Verificar si no hay mensajes suficientes
-      const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+      // Verificar calidad de datos
+      const dataQuality = (conversation.metadata as any)?.dataQuality
+      const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+      
+      // Si los datos son incompletos, no especular
+      if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+        return 'Datos insuficientes para determinar interés'
+      }
+      
+      // Verificar si hay mensajes para analizar
+      const hasNoMessages = conversation.totalMessages <= 1 && 
+        (conversation.lastMessage === '[SIN MENSAJES EN DATOS ORIGINALES]' || 
+         conversation.lastMessage === 'No se ha iniciado conversación')
       
       if (hasNoMessages) {
-        return 'No identificado (falta de mensajes para evaluar intención)'
+        return 'Sin mensajes para evaluar intención'
       }
       
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'Identifica el principal interés o necesidad del cliente basándote en la conversación.'
-          },
-          {
-            role: 'user',
-            content: `Identifica el interés principal del cliente:
+      // Análisis básico de palabras clave en el mensaje real
+      const message = conversation.lastMessage.toLowerCase()
+      
+      // Detectar intenciones evidentes solo si están claramente expresadas
+      if (message.includes('precio') || message.includes('costo') || message.includes('cuánto cuesta')) {
+        return 'Consulta de precios'
+      } else if (message.includes('disponible') || message.includes('stock') || message.includes('tienen')) {
+        return 'Verificación de disponibilidad'
+      } else if (message.includes('comprar') || message.includes('adquirir') || message.includes('me interesa comprar')) {
+        return 'Intención de compra expresada'
+      } else if (message.includes('problema') || message.includes('no funciona') || message.includes('ayuda') || message.includes('soporte')) {
+        return 'Solicitud de soporte'
+      } else if (message.includes('información') || message.includes('detalles') || message.includes('más info')) {
+        return 'Solicitud de información'
+      } else {
+        // Para casos ambiguos, usar IA con restricciones
+        const response = await this.openai.chat.completions.create({
+          model: this.model,
+          messages: [
+            {
+              role: 'system',
+              content: `Identifica el interés del cliente basándote ÚNICAMENTE en el mensaje exacto proporcionado. 
+              Si el mensaje es ambiguo o no expresa claramente una intención, responde "No claramente identificado".
+              NO hagas suposiciones más allá de lo explícitamente expresado.`
+            },
+            {
+              role: 'user',
+              content: `Mensaje exacto del cliente: "${conversation.lastMessage}"
 
-**Último mensaje:** ${conversation.lastMessage}
-**Total mensajes:** ${conversation.totalMessages}
-**Estado:** ${conversation.status}
+Estado de la conversación: ${conversation.status}
 
-Responde con UNA palabra o frase corta (máximo 30 caracteres) que describa el interés principal.`
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 50
-      })
+Identifica el interés en máximo 25 caracteres. Si no está claro, responde "No claramente identificado".`
+            }
+          ],
+          temperature: 0.1, // Muy conservador
+          max_tokens: 30
+        })
 
-      return response.choices[0].message.content?.trim() || 'Información general'
+        const interest = response.choices[0].message.content?.trim() || 'No identificado'
+        
+        // Si la respuesta parece especulativa, usar análisis conservador
+        if (interest.includes('posible') || interest.includes('probable') || 
+            interest.includes('parece') || interest.includes('sugiere')) {
+          return 'Requiere aclaración'
+        }
+        
+        return interest
+      }
     } catch (error) {
       console.error('Error generando interés:', error)
-      
-      // Determinar interés basado en palabras clave del último mensaje
-      const message = conversation.lastMessage.toLowerCase()
-      if (message.includes('precio') || message.includes('costo') || message.includes('cuanto')) {
-        return 'Consulta de precios'
-      } else if (message.includes('stock') || message.includes('disponible') || message.includes('tienen')) {
-        return 'Verificación de stock'
-      } else if (message.includes('comprar') || message.includes('pedir') || message.includes('quiero')) {
-        return 'Intención de compra'
-      } else if (message.includes('problema') || message.includes('ayuda') || message.includes('soporte')) {
-        return 'Soporte técnico'
-      } else {
-        return 'Información general'
-      }
+      return 'Error en análisis - revisar manualmente'
     }
   }
 
   async generateSalesPotential(conversation: Conversation): Promise<'low' | 'medium' | 'high'> {
     try {
-      const response = await this.openai.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'Evalúa el potencial de venta basándote en la conversación. Responde solo con: low, medium, o high'
-          },
-          {
-            role: 'user',
-            content: `Evalúa el potencial de venta:
-
-**Estado:** ${conversation.status}
-**Total mensajes:** ${conversation.totalMessages}
-**Último mensaje:** ${conversation.lastMessage}
-
-¿Cuál es el potencial de venta? Responde solo con: low, medium, o high`
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 10
-      })
-
-      const result = response.choices[0].message.content?.trim().toLowerCase()
-      if (result === 'high' || result === 'medium' || result === 'low') {
-        return result as 'low' | 'medium' | 'high'
+      // Verificar calidad de datos
+      const dataQuality = (conversation.metadata as any)?.dataQuality
+      const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+      
+      // Si los datos son incompletos, potencial bajo por defecto
+      if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.5)) {
+        return 'low'
       }
-      return 'medium'
+      
+      // Lógica conservadora basada solo en datos evidentes
+      if (conversation.status === 'completed') {
+        return 'high' // Ya se completó algo
+      }
+      
+      if (conversation.status === 'abandoned') {
+        return 'low' // Fue abandonado
+      }
+      
+      // Analizar mensaje para evidencia clara de intención
+      const message = conversation.lastMessage.toLowerCase()
+      
+      if (message.includes('comprar') || message.includes('cuando puedo') || 
+          message.includes('confirmo pedido') || message.includes('proceder con')) {
+        return 'high'
+      }
+      
+      if (message.includes('precio') || message.includes('disponible') || 
+          message.includes('información') || message.includes('detalles')) {
+        return 'medium'
+      }
+      
+      // Considerar actividad (número de mensajes)
+      if (conversation.totalMessages > 10) {
+        return 'medium' // Alta actividad puede indicar interés
+      }
+      
+      if (conversation.totalMessages > 5) {
+        return 'medium'
+      }
+      
+      return 'low' // Por defecto conservador
+      
     } catch (error) {
       console.error('Error evaluando potencial de venta:', error)
-      
-      // Lógica de respaldo
-      if (conversation.status === 'completed') return 'high'
-      if (conversation.status === 'abandoned') return 'low'
-      if (conversation.totalMessages > 10) return 'high'
-      if (conversation.totalMessages > 5) return 'medium'
-      return 'low'
+      return 'low' // Conservador en caso de error
     }
   }
 }

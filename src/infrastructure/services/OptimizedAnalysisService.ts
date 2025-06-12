@@ -27,40 +27,41 @@ export class OptimizedAnalysisService implements IAnalysisService {
   
   // Reglas locales para análisis básico (sin IA)
   private localRules: LocalAnalysisRule[] = [
+    // Reglas conservadoras basadas en palabras clave evidentes
     {
-      keyword: ['gracias', 'perfecto', 'excelente', 'bien', 'ok'],
-      sentiment: SentimentLabel.POSITIVE,
-      intent: IntentType.GENERAL_INFO,
-      confidence: 0.8
-    },
-    {
-      keyword: ['precio', 'costo', 'cuanto', 'valor', '€', '$'],
+      keyword: ['precio', 'costo', 'cuánto cuesta', 'valor', 'cotización'],
       sentiment: SentimentLabel.NEUTRAL,
       intent: IntentType.PRICE_INQUIRY,
       confidence: 0.9
     },
     {
-      keyword: ['stock', 'disponible', 'tienen', 'hay'],
+      keyword: ['disponible', 'stock', 'tienen', 'hay', 'existencia'],
       sentiment: SentimentLabel.NEUTRAL,
       intent: IntentType.STOCK_CHECK,
-      confidence: 0.85
-    },
-    {
-      keyword: ['comprar', 'compro', 'quiero', 'necesito', 'pedir'],
-      sentiment: SentimentLabel.POSITIVE,
-      intent: IntentType.PURCHASE_INTENT,
       confidence: 0.9
     },
     {
-      keyword: ['problema', 'error', 'mal', 'no funciona', 'roto'],
+      keyword: ['comprar', 'adquirir', 'confirmo pedido', 'me interesa comprar', 'proceder con'],
+      sentiment: SentimentLabel.POSITIVE,
+      intent: IntentType.PURCHASE_INTENT,
+      confidence: 0.95
+    },
+    {
+      keyword: ['problema', 'no funciona', 'falla', 'error', 'defecto'],
       sentiment: SentimentLabel.NEGATIVE,
       intent: IntentType.COMPLAINT,
+      confidence: 0.9
+    },
+    {
+      keyword: ['ayuda', 'soporte', 'asistencia', 'cómo usar', 'tutorial'],
+      sentiment: SentimentLabel.NEUTRAL,
+      intent: IntentType.SUPPORT,
       confidence: 0.85
     },
     {
-      keyword: ['ayuda', 'soporte', 'como', 'instrucciones'],
+      keyword: ['información', 'detalles', 'especificaciones', 'características'],
       sentiment: SentimentLabel.NEUTRAL,
-      intent: IntentType.SUPPORT,
+      intent: IntentType.GENERAL_INFO,
       confidence: 0.8
     }
   ]
@@ -253,23 +254,35 @@ export class OptimizedAnalysisService implements IAnalysisService {
   }
 
   private generateLocalSummary(conversation: Conversation): string {
-    const status = conversation.status
-    const messages = conversation.totalMessages
-    const hasNoMessages = messages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+    // Verificar si hay datos reales para resumir
+    const hasNoMessages = conversation.totalMessages <= 1 && 
+      (conversation.lastMessage === '[SIN MENSAJES EN DATOS ORIGINALES]' || 
+       conversation.lastMessage === 'No se ha iniciado conversación')
     
     if (hasNoMessages) {
-      return `No hay mensajes registrados para analizar. La conversación con ${conversation.customerName} está marcada como ${status === 'pending' ? 'pendiente' : status}.`
+      return `📋 ${conversation.customerName}. Sin mensajes en datos originales. Estado: ${conversation.status}.`
     }
     
-    if (status === 'completed') {
-      return `Cliente ${conversation.customerName} completó exitosamente la conversación (${messages} mensajes)`
-    } else if (status === 'abandoned') {
-      return `Conversación abandonada con ${conversation.customerName} después de ${messages} mensajes`
-    } else if (status === 'pending') {
-      return `${conversation.customerName} está esperando respuesta (${messages} mensajes intercambiados)`
-    } else {
-      return `Conversación activa con ${conversation.customerName} (${messages} mensajes)`
+    // Generar resumen conservador basado en datos reales
+    const messagePrev = conversation.lastMessage.length > 60 
+      ? conversation.lastMessage.substring(0, 60) + '...' 
+      : conversation.lastMessage
+    
+    // Detectar intención evidente en el mensaje
+    const message = conversation.lastMessage.toLowerCase()
+    let intentSummary = ''
+    
+    if (message.includes('precio') || message.includes('costo')) {
+      intentSummary = ' - Consulta de precios'
+    } else if (message.includes('comprar') || message.includes('adquirir')) {
+      intentSummary = ' - Intención de compra'
+    } else if (message.includes('problema') || message.includes('ayuda')) {
+      intentSummary = ' - Solicita soporte'
+    } else if (message.includes('disponible') || message.includes('stock')) {
+      intentSummary = ' - Verifica disponibilidad'
     }
+    
+    return `📋 ${conversation.customerName} (${conversation.status})${intentSummary}. Último: "${messagePrev}"`
   }
 
   private generateLocalInsights(conversation: Conversation): string[] {
@@ -579,44 +592,102 @@ Máximo 50 caracteres por resumen. Sé preciso y conciso.`
   }
 
   async generateConversationSummary(conversation: Conversation): Promise<string> {
+    // Verificar calidad de datos antes de generar análisis
+    const dataQuality = (conversation.metadata as any)?.dataQuality
+    const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+    
+    // Si los datos son incompletos, generar resumen conservador
+    if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+      return `⚠️ Datos limitados: ${conversation.customerName}. Información incompleta en archivo original.`
+    }
+    
     return this.generateLocalSummary(conversation)
   }
 
   async generateConversationSuggestion(conversation: Conversation): Promise<string> {
+    // Verificar calidad de datos
+    const dataQuality = (conversation.metadata as any)?.dataQuality
+    const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+    
+    // Si los datos son incompletos, sugerir validación
+    if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+      return 'Validar y completar información del cliente antes de proceder'
+    }
+    
     const recommendations = this.generateLocalRecommendations(conversation)
-    return recommendations[0] || 'Realizar seguimiento personalizado'
+    return recommendations[0] || 'Realizar seguimiento según protocolo estándar'
   }
 
   async generateInterest(conversation: Conversation): Promise<string> {
-    const hasNoMessages = conversation.totalMessages <= 1 && conversation.lastMessage === 'No se ha iniciado conversación'
+    // Verificar calidad de datos
+    const dataQuality = (conversation.metadata as any)?.dataQuality
+    const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
     
-    if (hasNoMessages) {
-      return 'No identificado (falta de mensajes para evaluar intención)'
+    // Si los datos son incompletos, no especular
+    if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.3)) {
+      return 'Datos insuficientes para determinar interés'
     }
     
+    const hasNoMessages = conversation.totalMessages <= 1 && 
+      (conversation.lastMessage === '[SIN MENSAJES EN DATOS ORIGINALES]' || 
+       conversation.lastMessage === 'No se ha iniciado conversación')
+    
+    if (hasNoMessages) {
+      return 'Sin mensajes para evaluar intención'
+    }
+    
+    // Usar análisis local conservador basado en datos reales
     const intent = this.tryLocalAnalysis(conversation)?.intent.primary.type
     
     switch (intent) {
       case IntentType.PRICE_INQUIRY:
         return 'Consulta de precios'
       case IntentType.STOCK_CHECK:
-        return 'Verificación de stock'
+        return 'Verificación de disponibilidad'
       case IntentType.PURCHASE_INTENT:
-        return 'Intención de compra'
+        return 'Intención de compra expresada'
       case IntentType.COMPLAINT:
-        return 'Problema o queja'
+        return 'Solicitud de soporte'
       case IntentType.SUPPORT:
         return 'Soporte técnico'
       default:
-        return 'Información general'
+        // Análisis básico de palabras clave solo en el mensaje real
+        const message = conversation.lastMessage.toLowerCase()
+        if (message.includes('precio') || message.includes('costo')) {
+          return 'Consulta de precios'
+        } else if (message.includes('disponible') || message.includes('stock')) {
+          return 'Verificación de disponibilidad'
+        } else if (message.includes('información') || message.includes('detalles')) {
+          return 'Solicitud de información'
+        } else {
+          return 'Requiere aclaración'
+        }
     }
   }
 
   async generateSalesPotential(conversation: Conversation): Promise<'low' | 'medium' | 'high'> {
+    // Verificar calidad de datos
+    const dataQuality = (conversation.metadata as any)?.dataQuality
+    const hasIncompleteData = (conversation.metadata as any)?.incompleteData || false
+    
+    // Si los datos son incompletos, potencial bajo por defecto
+    if (hasIncompleteData || (dataQuality && dataQuality.completenessScore < 0.5)) {
+      return 'low'
+    }
+    
+    // Lógica conservadora basada solo en datos evidentes
     if (conversation.status === 'completed') return 'high'
     if (conversation.status === 'abandoned') return 'low'
-    if (conversation.totalMessages > 10) return 'high'
+    
+    // Considerar actividad real documentada
+    if (conversation.totalMessages > 10) return 'medium'
     if (conversation.totalMessages > 5) return 'medium'
+    
+    // Análizar mensaje real para evidencia de intención
+    const message = conversation.lastMessage.toLowerCase()
+    if (message.includes('comprar') || message.includes('confirmo')) return 'high'
+    if (message.includes('precio') || message.includes('información')) return 'medium'
+    
     return 'low'
   }
 } 
