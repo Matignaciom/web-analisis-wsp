@@ -339,7 +339,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Análisis Avanzado de Datos - Siempre generado dinámicamente si hay datos */}
       {dynamicMetrics && dynamicMetrics.length > 0 && conversations.length > 0 && (
         <div className={styles.dynamicSection}>
-          <h3 className={styles.sectionTitle}>
+          <h3 className={styles.sectionTitle} style={{ color: '#1e293b' }}>
             📈 Análisis Avanzado de Datos
           </h3>
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>
@@ -354,7 +354,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Mensaje cuando no hay suficientes datos para análisis avanzado */}
       {(!dynamicMetrics || dynamicMetrics.length === 0) && conversations.length > 0 && (
         <div className={styles.dynamicSection}>
-          <h3 className={styles.sectionTitle}>
+          <h3 className={styles.sectionTitle} style={{ color: '#1e293b' }}>
             📈 Análisis Avanzado de Datos
           </h3>
           <div style={{ 

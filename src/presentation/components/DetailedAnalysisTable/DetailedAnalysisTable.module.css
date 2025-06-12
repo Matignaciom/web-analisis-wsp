@@ -195,26 +195,33 @@
   background: #f9fafb;
   border: 1px solid #d1d5db;
   color: #6b7280;
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  min-height: 50px;
+  position: relative;
+  overflow: hidden;
 }
 
 .statusFilterButton:hover {
   background: #f3f4f6;
   border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .statusFilterButton.active {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   color: white;
   border-color: #3b82f6;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
 }
 
+/* Estilos específicos para cada filtro */
 .statusFilterButton.todas {
   background: #374151;
   color: white;
@@ -223,6 +230,7 @@
 
 .statusFilterButton.todas:hover {
   background: #4b5563;
+  box-shadow: 0 4px 12px rgba(75, 85, 99, 0.3);
 }
 
 .statusFilterButton.iniciadas {
@@ -231,16 +239,97 @@
   border-color: #10b981;
 }
 
+.statusFilterButton.iniciadas:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
 .statusFilterButton.abandonadas {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: white;
   border-color: #ef4444;
 }
 
+.statusFilterButton.abandonadas:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
 .statusFilterButton.ventas {
   background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   color: white;
   border-color: #8b5cf6;
+}
+
+.statusFilterButton.ventas:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+/* Estilos de prioridad para los filtros */
+.statusFilterButton.priority-high {
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+}
+
+.statusFilterButton.priority-high::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ef4444, #f59e0b, #ef4444);
+  animation: pulse-priority 2s infinite;
+}
+
+.statusFilterButton.priority-medium {
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.1);
+}
+
+.statusFilterButton.priority-low {
+  border: 2px solid #10b981;
+}
+
+@keyframes pulse-priority {
+  0%, 100% { 
+    opacity: 0.7; 
+    transform: scaleX(1);
+  }
+  50% { 
+    opacity: 1; 
+    transform: scaleX(1.02);
+  }
+}
+
+/* Estilos mejorados para la celda de sugerencias IA */
+.aiSuggestionCell {
+  max-width: 400px;
+  position: relative;
+}
+
+.generatingMessage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #6b7280;
+  font-style: italic;
+  padding: 8px 12px;
+  background: linear-gradient(90deg, #f3f4f6, #f9fafb, #f3f4f6);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.generatingIcon {
+  animation: pulse 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 .tableContainer {

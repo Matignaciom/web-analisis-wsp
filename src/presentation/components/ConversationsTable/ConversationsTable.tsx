@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { Copy } from 'lucide-react'
 import type { Conversation } from '@/domain/entities/Conversation'
 import styles from './ConversationsTable.module.css'
 
@@ -80,7 +81,7 @@ const ConversationsTable: React.FC<ConversationsTableProps> = ({
           onClick={() => handleCopy(text, fieldId)}
           title={isCopied ? 'Copiado!' : 'Copiar'}
         >
-          {isCopied ? '✓' : '📋'}
+          {isCopied ? '✓' : <Copy size={14} />}
         </button>
       </div>
     )

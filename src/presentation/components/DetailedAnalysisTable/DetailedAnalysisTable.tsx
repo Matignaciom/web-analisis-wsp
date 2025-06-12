@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react'
+import { Copy } from 'lucide-react'
 import type { Conversation } from '@/domain/entities/Conversation'
 import { useExport } from '@/hooks/useExport'
 import { useDynamicDashboard } from '@/hooks/useDynamicDashboard'
-import { SentimentLabel, IntentType } from '@/domain/entities/AnalysisResult'
+
 import styles from './DetailedAnalysisTable.module.css'
 
 interface DetailedAnalysisTableProps {
@@ -12,7 +13,18 @@ interface DetailedAnalysisTableProps {
   onViewConversation?: (conversation: Conversation) => void
 }
 
-type StatusFilter = 'todas' | 'iniciadas' | 'abandonadas' | 'ventas'
+type StatusFilter = string // Ahora es dinámico
+
+interface StatusFilterWithMetrics {
+  id: StatusFilter
+  label: string
+  icon: string
+  count: number
+  percentage: number
+  description: string
+  priority: 'high' | 'medium' | 'low' | 'neutral'
+  filterLogic: (conv: Conversation) => boolean
+}
 
 const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
   conversations,
@@ -25,11 +37,178 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
   const [searchTerm, setSearchTerm] = useState('')
   const { exportToExcel, exportToPDF, isExporting } = useExport()
   
-  // Obtener dashboard dinámico para incluir en exportaciones
+  // Obtener dashboard dinámico para incluir en exportaciones y filtros inteligentes
   const { dashboard } = useDynamicDashboard({
     conversations,
     autoUpdate: false
   })
+
+  // 🔧 CONFIGURACIÓN DINÁMICA DE STATUS
+  const getStatusConfig = (status: string, _count: number, _total: number, rate: number, _metrics?: any) => {
+    const statusMap: Record<string, any> = {
+      'completed': {
+        label: 'Completadas',
+        icon: '✅',
+        description: `🏆 ${rate.toFixed(1)}% conversaciones completadas exitosamente`,
+        priority: 'high'
+      },
+      'active': {
+        label: 'Activas',
+        icon: rate > 50 ? '🟢' : rate > 20 ? '🔄' : '⚠️',
+        description: rate > 50 ? `📈 Alta actividad: ${rate.toFixed(1)}% en progreso` : 
+                    rate > 20 ? `📊 Actividad moderada: ${rate.toFixed(1)}%` : 
+                    `📉 Baja actividad: ${rate.toFixed(1)}%`,
+        priority: rate > 30 ? 'high' : 'medium'
+      },
+      'pending': {
+        label: 'Pendientes',
+        icon: '⏳',
+        description: `⏳ ${rate.toFixed(1)}% esperando respuesta o acción`,
+        priority: rate > 30 ? 'medium' : 'low'
+      },
+      'abandoned': {
+        label: 'Abandonadas',
+        icon: rate > 30 ? '🚨' : '🔴',
+        description: rate > 30 ? `🚨 CRÍTICO: ${rate.toFixed(1)}% abandonadas` : 
+                    `📉 ${rate.toFixed(1)}% abandonadas - oportunidad de recuperación`,
+        priority: rate > 30 ? 'high' : 'medium'
+      },
+      'sin_definir': {
+        label: 'Sin definir',
+        icon: '❓',
+        description: `❓ ${rate.toFixed(1)}% sin status definido - requiere clasificación`,
+        priority: 'medium'
+      }
+    }
+    
+    return statusMap[status] || {
+      label: status.charAt(0).toUpperCase() + status.slice(1),
+      icon: '📝',
+      description: `📝 ${rate.toFixed(1)}% con status: ${status}`,
+      priority: 'low'
+    }
+  }
+  
+  // 🎯 CONFIGURACIÓN DINÁMICA DE POTENCIAL
+  const getPotentialConfig = (potential: string, _count: number, _total: number, percentage: number) => {
+    const potentialMap: Record<string, any> = {
+      'high': {
+        label: 'Alto Potencial',
+        icon: '🎯',
+        description: `🎯 ${percentage}% con alto potencial de conversión`,
+        priority: 'high'
+      },
+      'medium': {
+        label: 'Potencial Medio',
+        icon: '📈',
+        description: `📈 ${percentage}% con potencial moderado`,
+        priority: 'medium'
+      },
+      'low': {
+        label: 'Bajo Potencial',
+        icon: '📊',
+        description: `📊 ${percentage}% con potencial bajo`,
+        priority: 'low'
+      }
+    }
+    
+    return potentialMap[potential] || {
+      label: `Potencial ${potential}`,
+      icon: '📋',
+      description: `📋 ${percentage}% clasificado como: ${potential}`,
+      priority: 'neutral'
+    }
+  }
+
+  // 🚀 GENERAR FILTROS DINÁMICOS BASADOS EN DATOS REALES
+  const statusFiltersWithMetrics = useMemo((): StatusFilterWithMetrics[] => {
+    const total = conversations.length
+    if (total === 0) return []
+    
+    // Obtener métricas del dashboard para contexto
+    const metrics = dashboard?.mainMetrics
+    
+    // 1. ANÁLISIS DINÁMICO DE STATUS EXISTENTES
+    const statusCounts = conversations.reduce((acc, conv) => {
+      const status = conv.status || 'sin_definir'
+      acc[status] = (acc[status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    // 2. ANÁLISIS DINÁMICO DE POTENCIAL DE VENTAS
+    const salesPotentialCounts = conversations.reduce((acc, conv) => {
+      const potential = conv.salesPotential || 'no_evaluado'
+      acc[potential] = (acc[potential] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    console.log('🔍 Análisis dinámico:', { statusCounts, salesPotentialCounts, total })
+    
+    // 3. CREAR FILTROS DINÁMICOS
+    const filters: StatusFilterWithMetrics[] = []
+    
+    // Filtro "Todas" (siempre presente)
+    filters.push({
+      id: 'todas',
+      label: 'Todas',
+      icon: '📊',
+      count: total,
+      percentage: 100,
+      description: metrics 
+        ? `Vista completa: ${metrics.conversionRate.toFixed(1)}% conversión`
+        : 'Vista completa de todas las conversaciones',
+      priority: 'neutral',
+      filterLogic: () => true
+    })
+    
+    // 4. GENERAR FILTROS POR STATUS DINÁMICAMENTE
+    Object.entries(statusCounts)
+      .sort(([,a], [,b]) => b - a) // Ordenar por cantidad (mayor a menor)
+      .forEach(([status, count]) => {
+        if (count === 0) return
+        
+        const percentage = Math.round((count / total) * 100)
+        const rate = (count / total) * 100
+        
+        // Configuración dinámica por tipo de status
+        const statusConfig = getStatusConfig(status, count, total, rate, metrics)
+        
+        filters.push({
+          id: `status_${status}`,
+          label: statusConfig.label,
+          icon: statusConfig.icon,
+          count,
+          percentage,
+          description: statusConfig.description,
+          priority: statusConfig.priority,
+          filterLogic: (conv) => (conv.status || 'sin_definir') === status
+        })
+      })
+    
+    // 5. GENERAR FILTROS POR POTENCIAL DE VENTAS DINÁMICAMENTE
+    Object.entries(salesPotentialCounts)
+      .filter(([potential, count]) => count > 0 && potential !== 'no_evaluado')
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([potential, count]) => {
+        const percentage = Math.round((count / total) * 100)
+        const potentialConfig = getPotentialConfig(potential, count, total, percentage)
+        
+        filters.push({
+          id: `potential_${potential}`,
+          label: potentialConfig.label,
+          icon: potentialConfig.icon,
+          count,
+          percentage,
+          description: potentialConfig.description,
+          priority: potentialConfig.priority,
+          filterLogic: (conv) => conv.salesPotential === potential
+        })
+      })
+    
+    console.log('🎯 Filtros generados dinámicamente:', filters.map(f => ({ id: f.id, label: f.label, count: f.count })))
+    
+    return filters
+  }, [conversations, dashboard])
 
   // Filtrar conversaciones basado en filtros de IA, estado y búsqueda
   const filteredConversations = useMemo(() => {
@@ -90,25 +269,16 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       })
     }
 
-    // Aplicar filtro de estado
-    switch (statusFilter) {
-      case 'iniciadas':
-        filtered = filtered.filter(conv => conv.status === 'active' || conv.status === 'completed')
-        break
-      case 'abandonadas':
-        filtered = filtered.filter(conv => conv.status === 'abandoned')
-        break
-      case 'ventas':
-        filtered = filtered.filter(conv => conv.status === 'completed' || conv.salesPotential === 'high')
-        break
-      case 'todas':
-      default:
-        // No filtrar por estado
-        break
+    // Aplicar filtro de estado con lógica dinámica
+    if (statusFilter !== 'todas') {
+      const currentFilter = statusFiltersWithMetrics.find(f => f.id === statusFilter)
+      if (currentFilter && currentFilter.filterLogic) {
+        filtered = filtered.filter(currentFilter.filterLogic)
+      }
     }
 
     return filtered
-  }, [conversations, selectedAIFilters, statusFilter, searchTerm])
+  }, [conversations, selectedAIFilters, statusFilter, searchTerm, statusFiltersWithMetrics])
 
   const handleCopy = async (text: string, fieldId: string) => {
     try {
@@ -120,41 +290,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     }
   }
 
-  // Crear datos enriquecidos para exportación
   const createExportData = () => {
-    const analysisResults = filteredConversations
-      .filter(conv => conv.aiSummary || conv.aiSuggestion || conv.interest || conv.salesPotential)
-      .map(conv => ({
-        id: `ai-analysis-${conv.id}`,
-        conversationId: conv.id,
-        timestamp: new Date(),
-        sentiment: {
-          score: conv.salesPotential === 'high' ? 0.8 : conv.salesPotential === 'medium' ? 0.5 : 0.2,
-          label: conv.salesPotential === 'high' ? SentimentLabel.POSITIVE : 
-                conv.salesPotential === 'medium' ? SentimentLabel.NEUTRAL : SentimentLabel.NEGATIVE,
-          confidence: 0.85,
-          keywords: conv.interest ? [conv.interest] : []
-        },
-        intent: {
-          primary: {
-            type: IntentType.GENERAL_INFO,
-            category: 'General',
-            description: conv.interest || 'Información general',
-            confidence: 0.8
-          },
-          confidence: 0.8
-        },
-        summary: conv.aiSummary || `Conversación con ${conv.customerName} - ${conv.totalMessages} mensajes`,
-        keyInsights: conv.aiSuggestion ? [conv.aiSuggestion] : ['Análisis en proceso'],
-        recommendations: conv.aiSuggestion ? [conv.aiSuggestion] : ['Seguimiento recomendado'],
-        confidence: 0.85
-      }))
-
     return {
       conversations: filteredConversations,
-      analysisResults,
       metrics: dashboard?.mainMetrics,
-      dynamicMetrics: dashboard?.dynamicMetrics || [],
+      dynamicMetrics: dashboard?.dynamicMetrics,
       aiInsights: dashboard?.insights
     }
   }
@@ -166,8 +306,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       const exportData = createExportData()
       await exportToExcel(exportData, {
         includeAnalysis: true,
-        includeMetrics: true,
-        includeCharts: true
+        includeMetrics: true
       })
     } catch (error) {
       console.error('Error exportando a Excel:', error)
@@ -239,18 +378,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
           onClick={() => handleCopy(text, fieldId)}
           title={isCopied ? 'Copiado!' : 'Copiar'}
         >
-          {isCopied ? '✓' : '📋'}
+          {isCopied ? '✓' : <Copy size={14} />}
         </button>
       </div>
     )
   }
-
-  const statusFilterButtons: Array<{ id: StatusFilter; label: string; icon: string }> = [
-    { id: 'todas', label: 'Todas', icon: '📊' },
-    { id: 'iniciadas', label: 'Iniciadas', icon: '🟢' },
-    { id: 'abandonadas', label: 'Abandonadas', icon: '🔴' },
-    { id: 'ventas', label: 'Ventas', icon: '💜' }
-  ]
 
   return (
     <div className={styles.analysisContainer}>
@@ -332,23 +464,54 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
           )}
         </div>
 
-        {/* Filtros de estado */}
+        {/* Filtros de estado con métricas */}
         <div className={styles.statusFilters}>
-          {statusFilterButtons.map(button => (
+          {statusFiltersWithMetrics.map(filter => (
             <button
-              key={button.id}
-              className={`${styles.statusFilterButton} ${styles[button.id]} ${
-                statusFilter === button.id ? styles.active : ''
-              }`}
-              onClick={() => setStatusFilter(button.id)}
+              key={filter.id}
+              className={`${styles.statusFilterButton} ${styles[filter.id]} ${
+                statusFilter === filter.id ? styles.active : ''
+              } ${styles[`priority-${filter.priority}`] || ''}`}
+              onClick={() => setStatusFilter(filter.id)}
+              title={filter.description}
+              style={{
+                position: 'relative',
+                minWidth: '140px',
+                textAlign: 'left'
+              }}
             >
-              {button.icon} {button.label}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>{filter.icon}</span>
+                  <span style={{ fontWeight: '600' }}>{filter.label}</span>
+                  <span style={{ 
+                    background: 'rgba(0,0,0,0.1)', 
+                    padding: '2px 6px', 
+                    borderRadius: '10px', 
+                    fontSize: '10px',
+                    fontWeight: 'bold'
+                  }}>
+                    {filter.count}
+                  </span>
+                </div>
+                <div style={{ 
+                  fontSize: '10px', 
+                  opacity: 0.8, 
+                  lineHeight: '1.2',
+                  maxWidth: '130px',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis'
+                }}>
+                  {filter.description}
+                </div>
+              </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Contador de resultados */}
+      {/* Contador de resultados con contexto de métricas */}
       <div className={styles.resultsCount}>
         📊 Mostrando {filteredConversations.length} de {conversations.length} conversaciones
         {selectedAIFilters.length > 0 && (
@@ -359,6 +522,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
         {searchTerm && (
           <span style={{ color: '#059669', fontWeight: '500' }}>
             {' '}(búsqueda activa)
+          </span>
+        )}
+        {statusFilter !== 'todas' && (
+          <span style={{ color: '#8b5cf6', fontWeight: '500' }}>
+            {' '}· {statusFiltersWithMetrics.find(f => f.id === statusFilter)?.percentage}% del total
           </span>
         )}
       </div>
@@ -424,13 +592,13 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                           onClick={() => handleCopy(conv.aiSummary!, `summary-${conv.id}`)}
                           title={copiedField === `summary-${conv.id}` ? 'Copiado!' : 'Copiar resumen'}
                         >
-                          {copiedField === `summary-${conv.id}` ? '✓' : '📋'}
+                          {copiedField === `summary-${conv.id}` ? '✓' : <Copy size={14} />}
                         </button>
                       </div>
                     ) : (
                       <div className={styles.generatingMessage}>
                         <span className={styles.generatingIcon}>🤖</span>
-                        <span>Generando resumen...</span>
+                        <span>Analizando y generando resumen...</span>
                       </div>
                     )}
                   </td>
@@ -446,7 +614,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                           onClick={() => handleCopy(conv.aiSuggestion!, `suggestion-${conv.id}`)}
                           title={copiedField === `suggestion-${conv.id}` ? 'Copiado!' : 'Copiar sugerencia'}
                         >
-                          {copiedField === `suggestion-${conv.id}` ? '✓' : '📋'}
+                          {copiedField === `suggestion-${conv.id}` ? '✓' : <Copy size={14} />}
                         </button>
                       </div>
                     ) : (
@@ -461,7 +629,6 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                     <button
                       className={styles.viewButton}
                       onClick={() => onViewConversation?.(conv)}
-                      title="Ver análisis completo y detalles de la conversación"
                     >
                       👁️ Ver Detalles
                     </button>
@@ -488,7 +655,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
         <div className={styles.resultsCount}>
           Mostrando {filteredConversations.length} de {conversations.length} conversaciones
           {selectedAIFilters.length > 0 && ` · Filtro IA activo`}
-          {statusFilter !== 'todas' && ` · Estado: ${statusFilterButtons.find(b => b.id === statusFilter)?.label}`}
+          {statusFilter !== 'todas' && ` · Estado: ${statusFiltersWithMetrics.find(b => b.id === statusFilter)?.label}`}
         </div>
       )}
     </div>

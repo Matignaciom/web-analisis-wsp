@@ -309,10 +309,6 @@ export class DynamicMetricsService {
       Math.round((satisfactionSum / validConversations) * 10) / 10 : 3.5
   }
 
-
-
-
-
   // 🔄 MAPEAR RESPUESTA DE IA A MÉTRICAS
   private mapAIResponseToMetrics(aiResponse: any, conversations: Conversation[]): DashboardMetrics {
     return {
@@ -1051,17 +1047,44 @@ export class DynamicMetricsService {
     }
 
     try {
-      // Preparar contexto específico para la IA
+      // Preparar contexto específico para la IA incluyendo métricas de rendimiento y análisis avanzado
       const context = this.prepareAIContext(conversations, metrics)
       
+      // Crear contexto específico para el resumen
+      const summaryContext = `
+GENERAR RESUMEN EJECUTIVO BASADO EN MÉTRICAS DE RENDIMIENTO Y ANÁLISIS AVANZADO:
+
+${context}
+
+INSTRUCCIONES: Generar un resumen ejecutivo que integre las métricas de rendimiento principales con el análisis avanzado de datos. El resumen debe ser específico, cuantificado y orientado a resultados empresariales. Incluir tendencias, patrones identificados y su impacto en el negocio.
+      `
+      
       // Generar resumen con contexto mejorado para IA
-      console.log('📊 Contexto preparado para IA:', context)
+      console.log('📊 Contexto preparado para IA:', summaryContext)
       
-      const aiSummary = await this.analysisService.generateSummary(conversations.slice(0, 10)) // Muestra representativa
+      const aiSummary = await this.analysisService.generateSummary([{
+        id: 'summary-analysis',
+        customerName: 'Resumen Ejecutivo',
+        customerPhone: '',
+        startDate: new Date(),
+        status: 'completed' as any,
+        totalMessages: 1,
+        lastMessage: summaryContext,
+        assignedAgent: 'Sistema IA',
+        tags: ['resumen', 'métricas', 'análisis'],
+        metadata: {
+          source: 'summary-analysis',
+          responseTime: 0
+        }
+      }])
       
-      // Si la IA devuelve un resumen genérico, usar nuestro resumen detallado
-      if (aiSummary.length < 100 || !aiSummary.includes(metrics.totalConversations.toString())) {
-        return this.generateFallbackInsights(conversations, metrics).summary
+      // Validar que el resumen contenga información específica de las métricas
+      if (aiSummary.length < 100 || 
+          (!aiSummary.includes(metrics.totalConversations.toString()) && 
+           !aiSummary.includes(metrics.conversionRate.toFixed(1)))) {
+        // Combinar resumen de IA con datos específicos de métricas
+        const fallbackSummary = this.generateFallbackInsights(conversations, metrics).summary
+        return `${aiSummary}\n\n${fallbackSummary}`
       }
       
       return aiSummary
@@ -1089,7 +1112,13 @@ export class DynamicMetricsService {
     const timeAnalysis = this.analyzeTimePatterns(conversations)
     const contentAnalysis = this.analyzeContentPatterns(conversations)
 
+    // Integrar métricas de rendimiento y análisis avanzado
+    const dynamicMetrics = this.generateUniqueCalculatedMetrics(conversations)
+    const advancedContext = this.prepareAdvancedDataContext(conversations)
+
     return `
+CONTEXTO INTEGRAL BASADO EN MÉTRICAS DE RENDIMIENTO Y ANÁLISIS AVANZADO:
+
 DATOS CLAVE DEL ANÁLISIS:
 - Total conversaciones: ${metrics.totalConversations}
 - Ventas completadas: ${metrics.completedSales}
@@ -1100,66 +1129,67 @@ DATOS CLAVE DEL ANÁLISIS:
 - Mensajes promedio por conversación: ${Math.round(contentAnalysis.avgMessageLength)}
 - Alto potencial: ${salesAnalysis.highPotential} leads (${salesAnalysis.highPotentialPercentage}%)
 - Tiempo respuesta promedio: ${metrics.averageResponseTime}
+
+ANÁLISIS AVANZADO DE DATOS:
+${advancedContext}
+
+MÉTRICAS DINÁMICAS GENERADAS:
+${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.category})`).join('\n')}
     `.trim()
   }
 
   private generateDataDrivenFindings(conversations: Conversation[], metrics: DashboardMetrics): string[] {
     const findings: string[] = []
     
-    // Análisis de conversión
+    // 📈 INTEGRAR MÉTRICAS DE RENDIMIENTO PRINCIPALES
+    // Análisis de conversión basado en métricas de rendimiento
     if (metrics.conversionRate > 25) {
-      findings.push(`Excelente tasa de conversión del ${metrics.conversionRate.toFixed(1)}% detectada en los datos`)
-    } else if (metrics.conversionRate < 10 && metrics.conversionRate > 0) {
-      findings.push(`Oportunidad de mejora: tasa de conversión del ${metrics.conversionRate.toFixed(1)}% por debajo del promedio de mercado`)
+      findings.push(`📈 Métricas de Rendimiento: Excelente tasa de conversión del ${metrics.conversionRate.toFixed(1)}% supera estándares de mercado (15-25%)`)
+    } else if (metrics.conversionRate < 15 && metrics.conversionRate > 0) {
+      findings.push(`📉 Métricas de Rendimiento: Tasa de conversión del ${metrics.conversionRate.toFixed(1)}% requiere optimización para alcanzar estándar de mercado`)
     }
 
-    // Análisis de engagement
-    const avgMessages = conversations.length > 0 
-      ? Math.round(conversations.reduce((sum, c) => sum + c.totalMessages, 0) / conversations.length)
-      : 0
-
-    if (avgMessages > 20) {
-      findings.push(`Conversaciones altamente comprometidas: promedio de ${avgMessages} mensajes por chat indica alto interés`)
-    } else if (avgMessages < 5) {
-      findings.push(`Oportunidad de mejorar engagement: promedio de ${avgMessages} mensajes sugiere conversaciones poco desarrolladas`)
-    }
-
-    // Análisis de etiquetado y organización
-    const withTags = conversations.filter(c => c.tags.length > 0).length
-    const taggedPercentage = conversations.length > 0 ? (withTags / conversations.length) * 100 : 0
+    // 📊 INTEGRAR ANÁLISIS AVANZADO DE DATOS
+    const dynamicMetrics = this.generateUniqueCalculatedMetrics(conversations)
+    const engagementMetric = dynamicMetrics.find(m => m.title.includes('Engagement'))
+    const qualityMetric = dynamicMetrics.find(m => m.title.includes('Calidad'))
     
-    if (taggedPercentage > 80) {
-      findings.push(`Excelente categorización: ${taggedPercentage.toFixed(1)}% de conversaciones etiquetadas facilita el análisis`)
-    } else if (taggedPercentage < 30) {
-      findings.push(`Sistema de etiquetado infrautilizado: solo ${taggedPercentage.toFixed(1)}% de conversaciones categorizadas`)
-    }
-
-    // Análisis de potencial de ventas
-    const highPotential = conversations.filter(c => c.salesPotential === 'high').length
-    const totalWithPotential = conversations.filter(c => c.salesPotential).length
-    
-    if (highPotential > 0 && totalWithPotential > 0) {
-      const highPotentialPercentage = (highPotential / totalWithPotential) * 100
-      if (highPotentialPercentage > 30) {
-        findings.push(`${highPotential} leads de alto potencial identificados (${highPotentialPercentage.toFixed(1)}% del total evaluado)`)
+    if (engagementMetric) {
+      const engagementValue = parseInt(engagementMetric.value.toString().replace(/\D/g, '')) || 0
+      if (engagementValue > 60) {
+        findings.push(`📊 Análisis Avanzado: ${engagementMetric.title} del ${engagementValue}% indica alta interacción con clientes`)
+      } else if (engagementValue < 30) {
+        findings.push(`📊 Análisis Avanzado: ${engagementMetric.title} del ${engagementValue}% sugiere necesidad de mejorar estrategias de engagement`)
       }
     }
 
-    // Análisis temporal
-    const today = new Date()
-    const thisWeek = conversations.filter(c => {
-      const daysDiff = Math.floor((today.getTime() - c.startDate.getTime()) / (1000 * 60 * 60 * 24))
-      return daysDiff <= 7
-    }).length
-
-    if (thisWeek > (conversations.length * 0.3)) {
-      findings.push(`Actividad reciente alta: ${thisWeek} conversaciones iniciadas esta semana`)
+    if (qualityMetric) {
+      const qualityValue = parseInt(qualityMetric.value.toString().replace(/\D/g, '')) || 0
+      if (qualityValue > 80) {
+        findings.push(`📊 Análisis Avanzado: ${qualityMetric.title} del ${qualityValue}% facilita análisis predictivo preciso`)
+      } else if (qualityValue < 60) {
+        findings.push(`📊 Análisis Avanzado: ${qualityMetric.title} del ${qualityValue}% requiere estandarización de datos`)
+      }
     }
 
-    // Análisis de abandono
-    const abandonedChats = conversations.filter(c => c.status === 'abandoned').length
-    if (abandonedChats > metrics.completedSales) {
-      findings.push(`${abandonedChats} conversaciones abandonadas superan las ventas completadas - oportunidad de recuperación`)
+    // Análisis de patrones específicos basado en métricas principales
+    const salesAnalysis = this.analyzeSalesPatterns(conversations)
+    const timeAnalysis = this.analyzeTimePatterns(conversations)
+    
+    // Hallazgos basados en métricas de abandono
+    if (metrics.abandonedChats > metrics.completedSales) {
+      const recoveryOpportunity = ((metrics.abandonedChats / metrics.totalConversations) * 100).toFixed(1)
+      findings.push(`🔄 Análisis de Recuperación: ${metrics.abandonedChats} conversaciones abandonadas representan ${recoveryOpportunity}% de oportunidades no capitalizadas`)
+    }
+
+    // Hallazgos basados en potencial de ventas del análisis avanzado
+    if (salesAnalysis.highPotentialPercentage > 30) {
+      findings.push(`🎯 Análisis de Potencial: ${salesAnalysis.highPotential} leads de alto potencial (${salesAnalysis.highPotentialPercentage}%) disponibles para conversión prioritaria`)
+    }
+
+    // Hallazgos temporales del análisis avanzado
+    if (timeAnalysis.peakHour !== -1 && timeAnalysis.weekendActivity > 20) {
+      findings.push(`⏰ Análisis Temporal: Actividad concentrada a las ${timeAnalysis.peakHour}:00 con ${timeAnalysis.weekendActivity}% en fines de semana indica oportunidad de horario extendido`)
     }
 
     // Análisis de satisfacción cuando está disponible
@@ -1170,130 +1200,131 @@ DATOS CLAVE DEL ANÁLISIS:
     if (satisfactionScores.length > 0) {
       const avgSatisfaction = satisfactionScores.reduce((sum, score) => sum + score, 0) / satisfactionScores.length
       if (avgSatisfaction >= 4.5) {
-        findings.push(`Excelente satisfacción del cliente: promedio de ${avgSatisfaction.toFixed(1)}/5 en ${satisfactionScores.length} evaluaciones`)
+        findings.push(`⭐ Métricas de Satisfacción: Promedio de ${avgSatisfaction.toFixed(1)}/5 en ${satisfactionScores.length} evaluaciones indica excelencia en servicio`)
       } else if (avgSatisfaction < 3.5) {
-        findings.push(`Atención requerida: satisfacción promedio de ${avgSatisfaction.toFixed(1)}/5 necesita mejora`)
+        findings.push(`⚠️ Métricas de Satisfacción: Promedio de ${avgSatisfaction.toFixed(1)}/5 requiere intervención inmediata en procesos de atención`)
       }
     }
 
     return findings.length > 0 ? findings : [
-      `Análisis de ${conversations.length} conversaciones completado con métricas básicas extraídas`,
-      `Sistema identificó patrones de comportamiento en los datos de WhatsApp procesados`
+      `📊 Análisis completado: ${conversations.length} conversaciones procesadas con métricas de rendimiento y análisis avanzado integrados`,
+      `🔍 Sistema identificó patrones específicos en datos de rendimiento empresarial`
     ]
   }
 
   private generateDataDrivenRecommendations(conversations: Conversation[], metrics: DashboardMetrics): string[] {
     const recommendations: string[] = []
     
-    // Análisis profundo para recomendaciones específicas
+    // 📈 RECOMENDACIONES BASADAS EN MÉTRICAS DE RENDIMIENTO
     const salesAnalysis = this.analyzeSalesPatterns(conversations)
     const agentAnalysis = this.analyzeAgentsPerformance(conversations)
     const timeAnalysis = this.analyzeTimePatterns(conversations)
     const contentAnalysis = this.analyzeContentPatterns(conversations)
     const satisfactionData = this.analyzeSatisfactionPatterns(conversations)
 
-    // Recomendaciones CRÍTICAS basadas en abandono
+    // 📊 INTEGRAR MÉTRICAS DINÁMICAS EN RECOMENDACIONES
+    const dynamicMetrics = this.generateUniqueCalculatedMetrics(conversations)
+    const opportunitiesMetric = dynamicMetrics.find(m => m.title.includes('Oportunidades'))
+    const momentumMetric = dynamicMetrics.find(m => m.title.includes('Momentum'))
+    
+    // Recomendaciones CRÍTICAS basadas en métricas de rendimiento
     if (metrics.abandonedChats > metrics.completedSales) {
-      recommendations.push(`🚨 CRÍTICO: ${metrics.abandonedChats} conversaciones abandonadas superan las ${metrics.completedSales} ventas - implementar protocolo de recuperación inmediato`)
-      recommendations.push("Crear secuencia de seguimiento automatizada a las 24h, 48h y 7 días para conversaciones abandonadas")
+      const recoveryPotential = (metrics.abandonedChats * metrics.conversionRate / 100).toFixed(0)
+      recommendations.push(`🚨 MÉTRICAS CRÍTICAS: ${metrics.abandonedChats} conversaciones abandonadas vs ${metrics.completedSales} ventas - protocolo de recuperación podría generar ${recoveryPotential} ventas adicionales`)
+      recommendations.push(`📋 Implementar secuencia automatizada: contacto a 24h, 48h y 7 días para maximizar recuperación basada en análisis de patrones`)
     }
 
-    // Recomendaciones basadas en conversión con datos específicos
+    // Recomendaciones basadas en conversión y análisis avanzado
     if (metrics.conversionRate < 15 && metrics.conversionRate > 0) {
-      recommendations.push(`Mejorar tasa de conversión actual del ${metrics.conversionRate.toFixed(1)}% - objetivo: alcanzar 20-25%`)
-      recommendations.push("Analizar las ${metrics.completedSales} ventas exitosas para identificar patrones y replicar técnicas")
+      const improvementTarget = 15 - metrics.conversionRate
+      const potentialSales = Math.round((metrics.totalConversations * improvementTarget / 100))
+      recommendations.push(`📈 OPTIMIZACIÓN DE RENDIMIENTO: Mejorar conversión del ${metrics.conversionRate.toFixed(1)}% al 15% generaría ${potentialSales} ventas adicionales`)
+      recommendations.push(`🔍 Analizar ${metrics.completedSales} ventas exitosas para replicar técnicas en análisis de datos`)
     } else if (metrics.conversionRate > 25) {
-      recommendations.push(`Excelente conversión del ${metrics.conversionRate.toFixed(1)}% - documentar y entrenar al equipo en estas técnicas`)
+      recommendations.push(`🏆 MÉTRICAS EXCELENTES: Conversión del ${metrics.conversionRate.toFixed(1)}% - documentar mejores prácticas y escalar metodología`)
     }
 
-    // Recomendaciones específicas de agentes
-    if (agentAnalysis.totalAgents > 1) {
-      if (agentAnalysis.topAgent) {
-        recommendations.push(`Usar a ${agentAnalysis.topAgent.name} como mentor - ha manejado ${agentAnalysis.topAgent.conversations} conversaciones exitosamente`)
-      }
-      
-      const agentDistribution = agentAnalysis.agents.map(([name, stats]) => `${name}: ${stats.conversations} conversaciones`)
-      if (agentDistribution.length > 1) {
-        recommendations.push("Balancear carga de trabajo entre agentes para optimizar eficiencia del equipo")
+    // Recomendaciones basadas en métricas dinámicas de oportunidades
+    if (opportunitiesMetric) {
+      const opportunityCount = parseInt(opportunitiesMetric.value.toString().replace(/\D/g, '')) || 0
+      if (opportunityCount > 0) {
+        recommendations.push(`🔄 ANÁLISIS AVANZADO: ${opportunityCount} oportunidades recuperables identificadas - implementar campaña específica de reactivación`)
       }
     }
 
-    // Recomendaciones basadas en potencial de ventas
+    // Recomendaciones basadas en momentum del negocio
+    if (momentumMetric && momentumMetric.trend) {
+      if (momentumMetric.trend.direction === 'up') {
+        recommendations.push(`🚀 MOMENTUM POSITIVO: Aprovechar tendencia creciente para expandir estrategias exitosas y aumentar capacidad`)
+      } else if (momentumMetric.trend.direction === 'down') {
+        recommendations.push(`📉 MOMENTUM NEGATIVO: Revisar procesos y implementar acciones correctivas inmediatas basadas en análisis de datos`)
+      }
+    }
+
+    // Recomendaciones específicas de agentes basadas en métricas
+    if (agentAnalysis.totalAgents > 1 && agentAnalysis.topAgent) {
+      const topAgentPerformance = ((agentAnalysis.topAgent.conversations / metrics.totalConversations) * 100).toFixed(1)
+      recommendations.push(`👨‍💼 ANÁLISIS DE RENDIMIENTO: ${agentAnalysis.topAgent.name} maneja ${topAgentPerformance}% de conversaciones - establecer como mentor y replicar metodología`)
+    }
+
+    // Recomendaciones basadas en potencial de ventas del análisis avanzado
     if (salesAnalysis.highPotentialPercentage > 0) {
-      recommendations.push(`Priorizar INMEDIATAMENTE ${salesAnalysis.highPotential} leads de alto potencial (${salesAnalysis.highPotentialPercentage}% del total)`)
+      const revenuePotential = (salesAnalysis.avgPurchaseValue * salesAnalysis.highPotential).toFixed(2)
+      recommendations.push(`🎯 PRIORIDAD ALTA: ${salesAnalysis.highPotential} leads de alto potencial (valor estimado: €${revenuePotential}) requieren seguimiento inmediato`)
       
       if (salesAnalysis.highPotentialPercentage < 20) {
-        recommendations.push("Implementar mejor sistema de calificación de leads - solo ${salesAnalysis.highPotentialPercentage}% son de alto potencial")
+        recommendations.push(`📊 CALIFICACIÓN DE LEADS: Solo ${salesAnalysis.highPotentialPercentage}% son alto potencial - mejorar sistema de scoring basado en análisis de datos`)
       }
     }
 
-    // Recomendaciones de tiempo de respuesta con datos específicos
+    // Recomendaciones de tiempo de respuesta basadas en métricas
     const responseTimes = conversations
       .map(c => c.metadata?.responseTime)
       .filter(rt => rt !== undefined && rt > 0) as number[]
     
     if (responseTimes.length > 0) {
       const avgResponseTime = responseTimes.reduce((sum, time) => sum + time, 0) / responseTimes.length
-      const fastestResponse = Math.min(...responseTimes)
-      const slowestResponse = Math.max(...responseTimes)
+      const conversionImpact = avgResponseTime > 30 ? (avgResponseTime - 30) * 0.02 : 0
       
       if (avgResponseTime > 60) {
-        recommendations.push(`⏰ Reducir tiempo de respuesta promedio de ${avgResponseTime.toFixed(0)} min a <30 min (rango actual: ${fastestResponse}-${slowestResponse} min)`)
-        recommendations.push("Implementar notificaciones push inmediatas y turnos de guardia para respuestas 24/7")
-      } else if (avgResponseTime < 15) {
-        recommendations.push(`Excelente tiempo de respuesta promedio de ${avgResponseTime.toFixed(0)} min - mantener este estándar`)
+        recommendations.push(`⏰ TIEMPO CRÍTICO: Respuesta promedio de ${avgResponseTime.toFixed(0)} min impacta conversión - objetivo <30 min podría mejorar conversión en ${conversionImpact.toFixed(1)}%`)
+        recommendations.push(`🔔 Implementar sistema de notificaciones inmediatas y turnos 24/7 basado en análisis de patrones temporales`)
       }
     }
 
-    // Recomendaciones basadas en patrones temporales específicos
+    // Recomendaciones basadas en patrones temporales del análisis avanzado
     if (timeAnalysis.peakHour !== -1) {
-      recommendations.push(`Reforzar equipo durante ${timeAnalysis.peakHour}:00-${timeAnalysis.peakHour + 1}:00 (hora de máxima actividad detectada)`)
-    }
-    
-    if (timeAnalysis.weekendActivity > 20) {
-      recommendations.push(`${timeAnalysis.weekendActivity}% de actividad en fines de semana - evaluar horario extendido o personal de guardia`)
+      const peakActivity = timeAnalysis.weekendActivity > 20 ? 'incluyendo fines de semana' : 'en días laborales'
+      recommendations.push(`📅 OPTIMIZACIÓN TEMPORAL: Reforzar personal ${timeAnalysis.peakHour}:00-${timeAnalysis.peakHour + 1}:00 ${peakActivity} según análisis de patrones`)
     }
 
-    // Recomendaciones de engagement basadas en contenido real
+    // Recomendaciones de engagement basadas en análisis avanzado
     if (contentAnalysis.avgMessageLength < 5) {
-      recommendations.push("Conversaciones muy cortas (promedio ${Math.round(contentAnalysis.avgMessageLength)} mensajes) - desarrollar técnicas para mayor engagement")
-      recommendations.push("Crear banco de preguntas abiertas específicas para aumentar interacción con clientes")
-    } else if (contentAnalysis.avgMessageLength > 25) {
-      recommendations.push("Conversaciones muy extensas - optimizar scripts para ser más directos y eficientes")
+      const engagementTarget = (contentAnalysis.avgMessageLength * 2).toFixed(1)
+      recommendations.push(`💬 ENGAGEMENT: Conversaciones promedio de ${Math.round(contentAnalysis.avgMessageLength)} mensajes - objetivo ${engagementTarget} mensajes con técnicas estructuradas`)
+      recommendations.push(`📝 Crear banco de preguntas específicas basado en análisis de contenido para aumentar interacción`)
     }
 
-    if (contentAnalysis.mostCommonTag) {
-      recommendations.push(`Tema más frecuente: "${contentAnalysis.mostCommonTag}" - crear respuestas especializadas y FAQ específicas`)
-    }
-
-    // Recomendaciones de satisfacción con datos específicos
+    // Recomendaciones de satisfacción basadas en métricas
     if (satisfactionData.hasData) {
       if (satisfactionData.excellentPercentage < 60) {
-        recommendations.push(`Mejorar satisfacción: solo ${satisfactionData.excellentPercentage}% reporta excelencia - meta: >80%`)
-        recommendations.push("Implementar seguimiento post-conversación y solicitar feedback específico sobre áreas de mejora")
-      } else if (satisfactionData.excellentPercentage > 80) {
-        recommendations.push(`Excelente satisfacción del ${satisfactionData.excellentPercentage}% - usar estos casos como ejemplos de mejores prácticas`)
+        const improvementTarget = 80 - satisfactionData.excellentPercentage
+        recommendations.push(`⭐ SATISFACCIÓN: Aumentar excelencia del ${satisfactionData.excellentPercentage}% al 80% (+${improvementTarget}%) con seguimiento post-conversación`)
       }
     } else {
-      recommendations.push("🔄 Implementar medición de satisfacción obligatoria al final de cada conversación para obtener métricas precisas")
+      recommendations.push(`📊 MEDICIÓN: Implementar scoring de satisfacción obligatorio para generar métricas precisas de rendimiento`)
     }
 
-    // Recomendaciones de organización y etiquetado
-    const untaggedConversations = conversations.filter(c => c.tags.length === 0).length
-    if (untaggedConversations > 5) {
-      recommendations.push(`Etiquetar ${untaggedConversations} conversaciones sin categorizar para mejorar análisis y seguimiento`)
-      recommendations.push("Implementar etiquetado automático basado en IA usando palabras clave detectadas en el contenido")
-    }
-
-    // Recomendaciones de valor económico si hay datos
+    // Recomendaciones de valor económico basadas en análisis de ventas
     if (salesAnalysis.avgPurchaseValue > 0) {
-      recommendations.push(`Valor promedio por venta: €${salesAnalysis.avgPurchaseValue.toFixed(2)} - enfocar esfuerzos en aumentar ticket promedio`)
+      const upsellPotential = (salesAnalysis.avgPurchaseValue * 1.2).toFixed(2)
+      recommendations.push(`💰 VALOR POR CLIENTE: Ticket promedio €${salesAnalysis.avgPurchaseValue.toFixed(2)} - estrategias de upselling podrían alcanzar €${upsellPotential}`)
     }
 
     return recommendations.length > 0 ? recommendations.slice(0, 10) : [
-      "Mantener consistencia en el proceso de seguimiento y documentación de conversaciones",
-      "Implementar revisiones semanales de métricas clave con todo el equipo",
-      "Establecer KPIs específicos basados en los patrones únicos identificados en tu negocio"
+      "📈 Mantener consistencia en análisis de métricas de rendimiento semanales",
+      "📊 Implementar revisiones de análisis avanzado con todo el equipo",
+      "🎯 Establecer KPIs específicos basados en patrones únicos identificados en datos"
     ]
   }
 

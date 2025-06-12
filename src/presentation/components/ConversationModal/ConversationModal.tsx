@@ -1,4 +1,5 @@
 import React from 'react'
+import { Copy } from 'lucide-react'
 import type { Conversation } from '@/domain/entities/Conversation'
 import styles from './ConversationModal.module.css'
 
@@ -134,7 +135,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                       }}
                       title="Copiar interés"
                     >
-                      📋
+                      <Copy size={14} />
                     </button>
                   )}
                 </div>
@@ -166,7 +167,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                       }}
                       title="Copiar resumen completo"
                     >
-                      📋
+                      <Copy size={14} />
                     </button>
                   )}
                 </div>
@@ -188,7 +189,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                       }}
                       title="Copiar sugerencia completa"
                     >
-                      📋
+                      <Copy size={14} />
                     </button>
                   )}
                 </div>
@@ -213,7 +214,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                   }}
                   title="Copiar mensaje"
                 >
-                  📋
+                  <Copy size={14} />
                 </button>
               </div>
               <p className={styles.messageContent}>

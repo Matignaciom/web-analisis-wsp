@@ -200,6 +200,16 @@
   color: #1e293b;
   margin: 0;
   word-wrap: break-word;
+  text-align: center;
+}
+
+.summarySubtext {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: #9ca3af;
+  margin: 0;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .previewInfo h4 {

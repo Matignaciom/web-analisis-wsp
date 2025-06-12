@@ -36,6 +36,34 @@ export class ExportService {
     }).format(value)
   }
 
+  // Función para localizar tipos de métricas al español
+  private localizeMetricType(type: string): string {
+    const typeMap: Record<string, string> = {
+      'number': 'Número',
+      'percentage': 'Porcentaje',
+      'currency': 'Moneda',
+      'text': 'Texto',
+      'time': 'Tiempo'
+    }
+    return typeMap[type] || type
+  }
+
+  // Función para mejorar las tendencias
+  private formatTrend(trend: any): string {
+    if (!trend || !trend.direction || trend.value === undefined || trend.value === null) {
+      return 'Sin tendencia'
+    }
+    
+    const directions = {
+      'up': 'Subida',
+      'down': 'Bajada', 
+      'neutral': 'Estable'
+    }
+    
+    const directionText = directions[trend.direction as keyof typeof directions] || 'Estable'
+    return `${directionText} ${trend.value}%`
+  }
+
   async exportToPDF(data: ExportData, options: ExportOptions = {}): Promise<Blob> {
     const pdf = new jsPDF()
     let yPosition = 20
@@ -107,29 +135,49 @@ export class ExportService {
   }
 
   private addMetricsToPDF(pdf: jsPDF, metrics: DashboardMetrics, yPosition: number): number {
-    pdf.setFontSize(16)
-    pdf.text('METRICAS GENERALES', 20, yPosition)
+    if (yPosition > 240) {
+      pdf.addPage()
+      yPosition = 20
+    }
+
+    pdf.setFontSize(14)
+    pdf.text('METRICAS DE RENDIMIENTO', 20, yPosition)
     yPosition += 15
 
     const metricsData = [
       ['Total Conversaciones', metrics.totalConversations.toString()],
       ['Ventas Completadas', metrics.completedSales.toString()],
       ['Chats Abandonados', metrics.abandonedChats.toString()],
-      ['Tiempo Promedio Respuesta', metrics.averageResponseTime],
-      ['Tasa de Conversion', `${(metrics.conversionRate * 100).toFixed(1)}%`],
-      ['Puntuacion Satisfaccion', `${metrics.satisfactionScore.toFixed(1)}/5`]
+      ['Tiempo Promedio Respuesta', metrics.averageResponseTime.toString()],
+      ['Tasa de Conversion', `${metrics.conversionRate.toFixed(1)}%`],
+      ['Puntuacion Satisfaccion', `${metrics.satisfactionScore.toFixed(1)}/5`],
     ]
 
     autoTable(pdf, {
       startY: yPosition,
-      head: [['Metrica', 'Valor']],
       body: metricsData,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [52, 152, 219] },
-      margin: { left: 20 }
+      styles: { 
+        fontSize: 9,
+        cellPadding: 4,
+        overflow: 'linebreak',
+        lineWidth: 0.1,
+        halign: 'left',
+        valign: 'top'
+      },
+      columnStyles: {
+        0: { cellWidth: 80, fontStyle: 'bold', valign: 'top' },
+        1: { cellWidth: 50, halign: 'right', valign: 'top' }
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto',
+      didParseCell: (hookData) => {
+        if (hookData.section === 'body') {
+          hookData.cell.styles.minCellHeight = 10
+        }
+      }
     })
 
-    return (pdf as any).lastAutoTable.finalY + 20
+    return (pdf as any).lastAutoTable.finalY + 15
   }
 
   private addDynamicMetricsToPDF(pdf: jsPDF, dynamicMetrics: any[], yPosition: number): number {
@@ -138,69 +186,54 @@ export class ExportService {
       yPosition = 20
     }
 
-    pdf.setFontSize(16)
-    pdf.text('📈 MÉTRICAS DE RENDIMIENTO DINÁMICAS', 20, yPosition)
-    yPosition += 10
-
-    pdf.setFontSize(10)
-    pdf.text('Análisis avanzado generado automáticamente por IA', 20, yPosition)
+    pdf.setFontSize(14)
+    pdf.text('METRICAS DINAMICAS - ANALISIS IA', 20, yPosition)
     yPosition += 15
 
-    // Agrupar métricas por categoría
-    const categorizedMetrics: Record<string, any[]> = {}
-    dynamicMetrics.forEach(metric => {
-      const category = metric.category || 'General'
-      if (!categorizedMetrics[category]) {
-        categorizedMetrics[category] = []
+    const metricsData = dynamicMetrics.slice(0, 10).map(metric => [
+      this.cleanTextForPDF(metric.title),
+      this.cleanTextForPDF(metric.value),
+      this.localizeMetricType(metric.type),
+      metric.category || 'General',
+      this.formatTrend(metric.trend)
+    ])
+
+    autoTable(pdf, {
+      startY: yPosition,
+      head: [['Métrica', 'Valor', 'Tipo', 'Categoría', 'Tendencia']],
+      body: metricsData,
+      styles: { 
+        fontSize: 8,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        lineWidth: 0.1,
+        halign: 'left',
+        valign: 'top'
+      },
+      headStyles: { 
+        fillColor: [16, 185, 129],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 8
+      },
+      columnStyles: {
+        0: { cellWidth: 60, fontStyle: 'bold', valign: 'top' },
+        1: { cellWidth: 35, halign: 'center', valign: 'top' },
+        2: { cellWidth: 25, valign: 'top' },
+        3: { cellWidth: 30, valign: 'top' },
+        4: { cellWidth: 30, halign: 'center', valign: 'top' }
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto',
+      didParseCell: (hookData) => {
+        if (hookData.section === 'body' && hookData.column.index === 0) {
+          // Asegurar altura mínima para el título de la métrica
+          hookData.cell.styles.minCellHeight = 10
+        }
       }
-      categorizedMetrics[category].push(metric)
     })
 
-    // Añadir cada categoría como una tabla separada
-    Object.entries(categorizedMetrics).forEach(([category, metrics]) => {
-      if (yPosition > 240) {
-        pdf.addPage()
-        yPosition = 20
-      }
-
-      pdf.setFontSize(12)
-      pdf.text(`🔹 ${category}`, 20, yPosition)
-      yPosition += 10
-
-      const metricsData = metrics.map(metric => {
-        const trendText = metric.trend ? 
-          `${metric.trend.direction === 'up' ? '↗️' : metric.trend.direction === 'down' ? '↘️' : '➡️'} ${metric.trend.value}%` : 
-          'N/A'
-        
-        return [
-          metric.title,
-          metric.value.toString(),
-          metric.type,
-          trendText,
-          metric.aiGenerated ? '🤖 IA' : '📊 Calc'
-        ]
-      })
-
-      autoTable(pdf, {
-        startY: yPosition,
-        head: [['Métrica', 'Valor', 'Tipo', 'Tendencia', 'Fuente']],
-        body: metricsData,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [139, 92, 246], fontSize: 9 },
-        columnStyles: {
-          0: { cellWidth: 45 },  // Métrica
-          1: { cellWidth: 25 },  // Valor
-          2: { cellWidth: 20 },  // Tipo
-          3: { cellWidth: 25 },  // Tendencia
-          4: { cellWidth: 15 }   // Fuente
-        },
-        margin: { left: 20, right: 20 }
-      })
-
-      yPosition = (pdf as any).lastAutoTable.finalY + 15
-    })
-
-    return yPosition
+    return (pdf as any).lastAutoTable.finalY + 15
   }
 
   private addConversationsTableToPDF(pdf: jsPDF, conversations: Conversation[], yPosition: number): number {
@@ -209,96 +242,114 @@ export class ExportService {
       yPosition = 20
     }
 
-    pdf.setFontSize(16)
-    pdf.text('LISTA DE CONVERSACIONES', 20, yPosition)
+    pdf.setFontSize(14)
+    pdf.text('LISTA DE CONVERSACIONES ANALIZADAS', 20, yPosition)
     yPosition += 15
 
-    const conversationsData = conversations.map(conv => [
-      conv.customerName,
-      conv.customerPhone,
-      this.getStatusLabelForPDF(conv.status),
+    const conversationsData = conversations.slice(0, 20).map(conv => [
+      this.cleanTextForPDF(conv.id),
+      this.cleanTextForPDF(conv.customerName),
+      this.cleanTextForPDF(conv.customerPhone),
+      this.getStatusLabelForPDF(conv.status as string),
       conv.totalMessages.toString(),
-      conv.startDate.toLocaleDateString('es-ES'),
-      conv.assignedAgent || 'Sin asignar',
-      this.truncateText(conv.lastMessage, 30)
+      this.cleanTextForPDF(conv.lastMessage)
     ])
 
     autoTable(pdf, {
       startY: yPosition,
-      head: [['Cliente', 'Telefono', 'Estado', 'Msgs', 'Fecha', 'Agente', 'Ultimo Mensaje']],
+      head: [['ID', 'Cliente', 'Teléfono', 'Estado', 'Mensajes', 'Último Mensaje']],
       body: conversationsData,
       styles: { 
         fontSize: 7,
-        cellPadding: 2,
+        cellPadding: 3,
         overflow: 'linebreak',
-        halign: 'left'
+        lineWidth: 0.1,
+        halign: 'left',
+        valign: 'top'
       },
       headStyles: { 
-        fillColor: [46, 204, 113],
-        fontSize: 8,
-        halign: 'center'
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 8
       },
       columnStyles: {
-        0: { cellWidth: 18 },  // Cliente - reducido de 22 a 18
-        1: { cellWidth: 16 },  // Teléfono - reducido de 20 a 16
-        2: { cellWidth: 16 },  // Estado - reducido de 18 a 16
-        3: { cellWidth: 10 },  // Mensajes - reducido de 12 a 10
-        4: { cellWidth: 16 },  // Fecha - reducido de 18 a 16
-        5: { cellWidth: 18 },  // Agente - reducido de 20 a 18
-        6: { cellWidth: 30 }   // Último Mensaje - reducido de 35 a 30
+        0: { cellWidth: 20, valign: 'top' },
+        1: { cellWidth: 30, valign: 'top' },
+        2: { cellWidth: 25, valign: 'top' },
+        3: { cellWidth: 20, valign: 'top' },
+        4: { cellWidth: 12, halign: 'center', valign: 'top' },
+        5: { cellWidth: 53, valign: 'top' }
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'wrap'
+      tableWidth: 'auto',
+      didParseCell: (hookData) => {
+        if (hookData.section === 'body' && hookData.column.index === 5) {
+          // Asegurar altura mínima para el último mensaje
+          hookData.cell.styles.minCellHeight = 12
+        }
+      }
     })
 
-    return (pdf as any).lastAutoTable.finalY + 20
+    return (pdf as any).lastAutoTable.finalY + 10
   }
 
   private addAnalysisTableToPDF(pdf: jsPDF, analysisResults: AnalysisResult[], yPosition: number): number {
-    if (yPosition > 250) {
+    if (yPosition > 240) {
       pdf.addPage()
       yPosition = 20
     }
 
-    pdf.setFontSize(16)
-    pdf.text('ANALISIS DE IA', 20, yPosition)
+    pdf.setFontSize(14)
+    pdf.text('ANALISIS DETALLADO DE IA', 20, yPosition)
     yPosition += 15
 
-    const analysisData = analysisResults.map(result => [
-      result.conversationId.substring(0, 6) + '...',
+    const analysisData = analysisResults.slice(0, 15).map(result => [
+      this.cleanTextForPDF(result.conversationId),
       this.getSentimentLabelForPDF(result.sentiment.label),
-      result.intent.primary.type,
-      `${(result.confidence * 100).toFixed(0)}%`,
-      this.truncateText(result.summary, 35)
+      `${(result.sentiment.confidence * 100).toFixed(0)}%`,
+      this.cleanTextForPDF(result.intent.primary.type),
+      `${(result.intent.primary.confidence * 100).toFixed(0)}%`,
+      this.cleanTextForPDF(result.summary)
     ])
 
     autoTable(pdf, {
       startY: yPosition,
-      head: [['ID Conv.', 'Sentimiento', 'Intencion', 'Conf.', 'Resumen']],
+      head: [['ID Conv.', 'Sentimiento', 'Conf.', 'Intención', 'Conf.', 'Resumen IA']],
       body: analysisData,
       styles: { 
         fontSize: 7,
-        cellPadding: 2,
+        cellPadding: 3,
         overflow: 'linebreak',
-        halign: 'left'
+        lineWidth: 0.1,
+        halign: 'left',
+        valign: 'top'
       },
       headStyles: { 
-        fillColor: [155, 89, 182],
-        fontSize: 8,
-        halign: 'center'
+        fillColor: [139, 92, 246],
+        textColor: 255,
+        fontStyle: 'bold',
+        fontSize: 8
       },
       columnStyles: {
-        0: { cellWidth: 18 },  // ID Conversación - reducido de 20 a 18
-        1: { cellWidth: 20 },  // Sentimiento - reducido de 22 a 20
-        2: { cellWidth: 22 },  // Intención - reducido de 25 a 22
-        3: { cellWidth: 12 },  // Confianza - reducido de 15 a 12
-        4: { cellWidth: 52 }   // Resumen - reducido de 63 a 52
+        0: { cellWidth: 20, valign: 'top' },
+        1: { cellWidth: 25, valign: 'top' },
+        2: { cellWidth: 12, halign: 'center', valign: 'top' },
+        3: { cellWidth: 25, valign: 'top' },
+        4: { cellWidth: 12, halign: 'center', valign: 'top' },
+        5: { cellWidth: 66, valign: 'top' }
       },
       margin: { left: 20, right: 20 },
-      tableWidth: 'wrap'
+      tableWidth: 'auto',
+      didParseCell: (hookData) => {
+        if (hookData.section === 'body' && hookData.column.index === 5) {
+          // Asegurar altura mínima para el resumen
+          hookData.cell.styles.minCellHeight = 12
+        }
+      }
     })
 
-    return (pdf as any).lastAutoTable.finalY + 20
+    return (pdf as any).lastAutoTable.finalY + 10
   }
 
   private addSummaryToPDF(pdf: jsPDF, data: ExportData, yPosition: number): void {
@@ -309,61 +360,223 @@ export class ExportService {
 
     pdf.setFontSize(16)
     pdf.text('RESUMEN EJECUTIVO CON ANALISIS IA', 20, yPosition)
-    yPosition += 15
+    yPosition += 20
 
-    pdf.setFontSize(12)
     const totalConversations = data.conversations.length
-    const completedConversations = data.conversations.filter(c => c.status === 'completed').length
+    // Corregir el filtro para usar los valores correctos de status
+    const completedConversations = data.conversations.filter(c => 
+      (c.status as any) === 'completed' || 
+      (c.status as any) === 'COMPLETED'
+    ).length
     const averageMessages = totalConversations > 0 ? 
       Math.round(data.conversations.reduce((acc, c) => acc + c.totalMessages, 0) / totalConversations) : 0
     const withAIAnalysis = data.conversations.filter(c => c.aiSummary || c.aiSuggestion).length
 
-    let summaryText = [
-      `* Total de conversaciones analizadas: ${totalConversations}`,
-      `* Conversaciones completadas: ${completedConversations} (${((completedConversations/totalConversations)*100).toFixed(1)}%)`,
-      `* Conversaciones con analisis IA: ${withAIAnalysis} (${((withAIAnalysis/totalConversations)*100).toFixed(1)}%)`,
-      `* Promedio de mensajes por conversacion: ${averageMessages}`,
-      `* Periodo analizado: ${data.conversations[0]?.startDate.toLocaleDateString('es-ES')} - ${data.conversations[data.conversations.length-1]?.startDate.toLocaleDateString('es-ES')}`,
-      ''
+    // Usar autoTable para el resumen básico para evitar superposiciones
+    const basicSummaryData = [
+      ['Total de conversaciones analizadas', totalConversations.toString()],
+      ['Conversaciones completadas', `${completedConversations} (${totalConversations > 0 ? ((completedConversations/totalConversations)*100).toFixed(1) : '0.0'}%)`],
+      ['Conversaciones con analisis IA', `${withAIAnalysis} (${totalConversations > 0 ? ((withAIAnalysis/totalConversations)*100).toFixed(1) : '0.0'}%)`],
+      ['Promedio de mensajes por conversacion', averageMessages.toString()],
+      ['Periodo analizado', `${data.conversations[0]?.startDate.toLocaleDateString('es-ES') || 'N/A'} - ${data.conversations[data.conversations.length-1]?.startDate.toLocaleDateString('es-ES') || 'N/A'}`]
     ]
+
+    autoTable(pdf, {
+      startY: yPosition,
+      body: basicSummaryData,
+      styles: { 
+        fontSize: 9,
+        cellPadding: 4,
+        overflow: 'linebreak',
+        lineWidth: 0.1,
+        halign: 'left',
+        valign: 'top'
+      },
+      columnStyles: {
+        0: { cellWidth: 80, fontStyle: 'bold', valign: 'top' },
+        1: { cellWidth: 80, valign: 'top' }
+      },
+      margin: { left: 20, right: 20 },
+      tableWidth: 'auto',
+      didParseCell: (hookData) => {
+        // Asegurar altura mínima para evitar superposiciones
+        if (hookData.section === 'body') {
+          const text = hookData.cell.raw as string
+          if (text && text.length > 50) {
+            hookData.cell.styles.minCellHeight = 15
+          }
+        }
+      }
+    })
+
+    yPosition = (pdf as any).lastAutoTable.finalY + 20
 
     // Agregar insights de IA si están disponibles
     if (data.aiInsights) {
-      summaryText.push('RESUMEN INTELIGENTE:')
-      summaryText.push(`${data.aiInsights.summary}`)
-      summaryText.push('')
-      
-      summaryText.push('HALLAZGOS CLAVE:')
-      data.aiInsights.keyFindings.forEach(finding => {
-        summaryText.push(`* ${finding}`)
-      })
-      summaryText.push('')
+      if (yPosition > 230) {
+        pdf.addPage()
+        yPosition = 20
+      }
 
-      summaryText.push('RECOMENDACIONES IA:')
-      data.aiInsights.recommendations.forEach(recommendation => {
-        summaryText.push(`* ${recommendation}`)
+      pdf.setFontSize(12)
+      pdf.text('RESUMEN INTELIGENTE:', 20, yPosition)
+      yPosition += 15
+
+      // Usar autoTable para el resumen inteligente para mejor control
+      const summaryData = [[this.cleanTextForPDF(data.aiInsights.summary)]]
+
+      autoTable(pdf, {
+        startY: yPosition,
+        body: summaryData,
+        styles: { 
+          fontSize: 9,
+          cellPadding: 4,
+          overflow: 'linebreak',
+          lineWidth: 0.1,
+          halign: 'left',
+          valign: 'top'
+        },
+        columnStyles: {
+          0: { cellWidth: 160, valign: 'top' }
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: 'auto',
+        didParseCell: (hookData) => {
+          if (hookData.section === 'body') {
+            hookData.cell.styles.minCellHeight = 20
+          }
+        }
       })
-    } else {
-      summaryText.push('RECOMENDACIONES GENERALES:')
-      summaryText.push('* Implementar respuestas automaticas para consultas frecuentes')
-      summaryText.push('* Capacitar agentes en manejo de objeciones')
-      summaryText.push('* Optimizar tiempo de respuesta en horarios pico')
-      summaryText.push('* Analizar patrones de abandono para mejorar retencion')
-      summaryText.push('* Establecer KPIs de satisfaccion por agente')
+
+      yPosition = (pdf as any).lastAutoTable.finalY + 15
+
+      // HALLAZGOS CLAVE usando autoTable
+      if (data.aiInsights.keyFindings.length > 0) {
+        if (yPosition > 230) {
+          pdf.addPage()
+          yPosition = 20
+        }
+
+        pdf.setFontSize(12)
+        pdf.text('HALLAZGOS CLAVE:', 20, yPosition)
+        yPosition += 10
+
+        const findingsData = data.aiInsights.keyFindings.map((finding, index) => [
+          `${index + 1}`,
+          this.cleanTextForPDF(finding)
+        ])
+
+        autoTable(pdf, {
+          startY: yPosition,
+          body: findingsData,
+          styles: { 
+            fontSize: 8,
+            cellPadding: 4,
+            overflow: 'linebreak',
+            lineWidth: 0.1,
+            halign: 'left',
+            valign: 'top'
+          },
+          columnStyles: {
+            0: { cellWidth: 12, halign: 'center', fontStyle: 'bold', valign: 'top' },
+            1: { cellWidth: 148, valign: 'top' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          didParseCell: (hookData) => {
+            if (hookData.section === 'body' && hookData.column.index === 1) {
+              hookData.cell.styles.minCellHeight = 12
+            }
+          }
+        })
+
+        yPosition = (pdf as any).lastAutoTable.finalY + 15
+      }
+
+      // RECOMENDACIONES IA usando autoTable
+      if (data.aiInsights.recommendations.length > 0) {
+        if (yPosition > 230) {
+          pdf.addPage()
+          yPosition = 20
+        }
+
+        pdf.setFontSize(12)
+        pdf.text('RECOMENDACIONES IA:', 20, yPosition)
+        yPosition += 10
+
+        const recommendationsData = data.aiInsights.recommendations.map((recommendation, index) => [
+          `${index + 1}`,
+          this.cleanTextForPDF(recommendation)
+        ])
+
+        autoTable(pdf, {
+          startY: yPosition,
+          body: recommendationsData,
+          styles: { 
+            fontSize: 8,
+            cellPadding: 4,
+            overflow: 'linebreak',
+            lineWidth: 0.1,
+            halign: 'left',
+            valign: 'top'
+          },
+          columnStyles: {
+            0: { cellWidth: 12, halign: 'center', fontStyle: 'bold', valign: 'top' },
+            1: { cellWidth: 148, valign: 'top' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          didParseCell: (hookData) => {
+            if (hookData.section === 'body' && hookData.column.index === 1) {
+              hookData.cell.styles.minCellHeight = 12
+            }
+          }
+        })
+
+        yPosition = (pdf as any).lastAutoTable.finalY + 15
+      }
     }
 
     // Agregar métricas dinámicas si están disponibles
     if (data.dynamicMetrics && data.dynamicMetrics.length > 0) {
-      summaryText.push('')
-      summaryText.push('METRICAS DINAMICAS DESTACADAS:')
-      data.dynamicMetrics.slice(0, 5).forEach(metric => {
-        summaryText.push(`* ${metric.title}: ${metric.value} (${metric.category || 'General'})`)
+      if (yPosition > 230) {
+        pdf.addPage()
+        yPosition = 20
+      }
+
+      pdf.setFontSize(12)
+      pdf.text('METRICAS DINAMICAS DESTACADAS:', 20, yPosition)
+      yPosition += 10
+
+      const metricsData = data.dynamicMetrics.slice(0, 5).map(metric => [
+        this.cleanTextForPDF(metric.title),
+        `${metric.value} (${metric.category || 'General'})`
+      ])
+
+      autoTable(pdf, {
+        startY: yPosition,
+        body: metricsData,
+        styles: { 
+          fontSize: 8,
+          cellPadding: 4,
+          overflow: 'linebreak',
+          lineWidth: 0.1,
+          halign: 'left',
+          valign: 'top'
+        },
+        columnStyles: {
+          0: { cellWidth: 80, fontStyle: 'bold', valign: 'top' },
+          1: { cellWidth: 80, valign: 'top' }
+        },
+        margin: { left: 20, right: 20 },
+        tableWidth: 'auto',
+        didParseCell: (hookData) => {
+          if (hookData.section === 'body') {
+            hookData.cell.styles.minCellHeight = 10
+          }
+        }
       })
     }
-
-    summaryText.forEach((line, index) => {
-      pdf.text(line, 20, yPosition + (index * 8))
-    })
   }
 
   private createConversationsWorksheet(conversations: Conversation[]): XLSX.WorkSheet {
@@ -398,7 +611,7 @@ export class ExportService {
       ['Ventas Completadas', metrics.completedSales],
       ['Chats Abandonados', metrics.abandonedChats],
       ['Tiempo Promedio Respuesta', metrics.averageResponseTime],
-      ['Tasa de Conversión', `${(metrics.conversionRate * 100).toFixed(1)}%`],
+      ['Tasa de Conversión', `${metrics.conversionRate.toFixed(1)}%`],
       ['Puntuación Satisfacción', `${metrics.satisfactionScore.toFixed(1)}/5`],
       ['', ''],
       ['Desglose por Estado', ''],
@@ -433,13 +646,13 @@ export class ExportService {
 
   private createDynamicMetricsWorksheet(dynamicMetrics: any[]): XLSX.WorkSheet {
     const data = dynamicMetrics.map(metric => ({
-      'Métrica': metric.title,
+      '📊 Métrica': metric.title,
       'Valor': metric.value,
       'Tipo': metric.type,
       'Categoría': metric.category || 'General',
       'Icono': metric.icon || '',
-      'Tendencia': metric.trend ? `${metric.trend.direction === 'up' ? '↗️' : metric.trend.direction === 'down' ? '↘️' : '➡️'} ${metric.trend.value}%` : 'N/A',
-      'Generado por IA': metric.aiGenerated ? '✅ Sí' : '❌ No'
+      'Tendencia': metric.trend ? `${metric.trend.direction === 'up' ? '↗️' : metric.trend.direction === 'down' ? '↘️' : '➡️'} ${metric.trend.value}%` : 'Sin tendencia',
+      '🤖 Generado por IA': metric.aiGenerated ? '✅ Sí' : '❌ No'
     }))
 
     return XLSX.utils.json_to_sheet(data)
@@ -447,10 +660,23 @@ export class ExportService {
 
   private createSummaryWorksheet(data: ExportData): XLSX.WorkSheet {
     const totalConversations = data.conversations.length
-    const completedConversations = data.conversations.filter(c => c.status === 'completed').length
-    const abandonedConversations = data.conversations.filter(c => c.status === 'abandoned').length
-    const activeConversations = data.conversations.filter(c => c.status === 'active').length
-    const pendingConversations = data.conversations.filter(c => c.status === 'pending').length
+    // Corregir el filtro para usar los valores correctos de status
+    const completedConversations = data.conversations.filter(c => 
+      (c.status as any) === 'completed' || 
+      (c.status as any) === 'COMPLETED'
+    ).length
+    const abandonedConversations = data.conversations.filter(c => 
+      (c.status as any) === 'abandoned' ||
+      (c.status as any) === 'ABANDONED'
+    ).length
+    const activeConversations = data.conversations.filter(c => 
+      (c.status as any) === 'active' ||
+      (c.status as any) === 'ACTIVE'
+    ).length
+    const pendingConversations = data.conversations.filter(c => 
+      (c.status as any) === 'pending' ||
+      (c.status as any) === 'PENDING'
+    ).length
 
     const averageMessages = totalConversations > 0 ? 
       Math.round(data.conversations.reduce((acc, c) => acc + c.totalMessages, 0) / totalConversations) : 0
@@ -476,9 +702,9 @@ export class ExportService {
       ['Tiempo de Respuesta (min)', avgResponseTime],
       [''],
       ['Porcentajes', ''],
-      ['Tasa de Conversión', `${((completedConversations/totalConversations)*100).toFixed(1)}%`],
-      ['Tasa de Abandono', `${((abandonedConversations/totalConversations)*100).toFixed(1)}%`],
-      ['Cobertura Análisis IA', `${((withAIAnalysis/totalConversations)*100).toFixed(1)}%`],
+      ['Tasa de Conversión', `${totalConversations > 0 ? ((completedConversations/totalConversations)*100).toFixed(1) : '0.0'}%`],
+      ['Tasa de Abandono', `${totalConversations > 0 ? ((abandonedConversations/totalConversations)*100).toFixed(1) : '0.0'}%`],
+      ['Cobertura Análisis IA', `${totalConversations > 0 ? ((withAIAnalysis/totalConversations)*100).toFixed(1) : '0.0'}%`],
       [''],
       ['Periodo Analizado', ''],
       ['Fecha Inicio', data.conversations[0]?.startDate.toLocaleDateString('es-ES') || 'N/A'],
@@ -567,10 +793,52 @@ export class ExportService {
     return sentimentMap[label] || label
   }
 
-  private truncateText(text: string, maxLength: number): string {
-    if (text.length <= maxLength) return text
-    return text.substring(0, maxLength - 3) + '...'
+  // private truncateText(text: string, maxLength: number): string {
+  //   if (text.length <= maxLength) return text
+  //   return text.substring(0, maxLength - 3) + '...'
+  // }
+
+  // Nueva función para limpiar texto de emojis y símbolos problemáticos para PDF
+  private cleanTextForPDF(text: string): string {
+    // Remover emojis y símbolos Unicode problemáticos
+    return text
+      .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // Emojis emocionales
+      .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // Símbolos y pictogramas
+      .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // Transporte y mapas
+      .replace(/[\u{1F700}-\u{1F77F}]/gu, '') // Símbolos alquímicos
+      .replace(/[\u{1F780}-\u{1F7FF}]/gu, '') // Símbolos geométricos extendidos
+      .replace(/[\u{1F800}-\u{1F8FF}]/gu, '') // Flechas suplementarias
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')   // Símbolos variados
+      .replace(/[\u{2700}-\u{27BF}]/gu, '')   // Dingbats
+      .replace(/📈|📊|📉|🔹|🤖|💡|🎯|📝|⚡|🏆|📋|⭐|🔄|💰|📱|⏰|👥|🎨|🔍|💎|🚀|⚙️|🌟|📌|🔧|📏|🎲/g, '') // Emojis específicos encontrados
+      .replace(/[^\x00-\x7F]/g, '') // Remover caracteres no ASCII
+      .trim()
   }
+
+  // Nueva función para dividir texto largo
+  // private wrapText(pdf: jsPDF, text: string, maxWidth: number): string[] {
+  //   const words = text.split(' ')
+  //   const lines: string[] = []
+  //   let currentLine = ''
+
+  //   words.forEach(word => {
+  //     const testLine = currentLine + (currentLine ? ' ' : '') + word
+  //     const testWidth = pdf.getTextWidth(testLine)
+      
+  //     if (testWidth > maxWidth && currentLine) {
+  //       lines.push(currentLine)
+  //       currentLine = word
+  //     } else {
+  //       currentLine = testLine
+  //     }
+  //   })
+
+  //   if (currentLine) {
+  //     lines.push(currentLine)
+  //   }
+
+  //   return lines
+  // }
 }
 
 export const exportService = new ExportService() 
