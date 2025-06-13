@@ -1776,15 +1776,15 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     const conversationsWithResponse = conversations.filter(c => c.totalMessages > 1).length
     summary.push(`• Conversaciones con respuesta: ${conversationsWithResponse}`)
     
-    // Resumen de satisfacción si está disponible
-    const satisfactionScores = conversations
-      .map(c => c.metadata?.satisfaction)
-      .filter(s => s !== undefined && s > 0)
-    
-    if (satisfactionScores.length > 0) {
-      const avgSatisfaction = satisfactionScores.reduce((sum: number, score: number) => sum + score, 0) / satisfactionScores.length
-      summary.push(`• Promedio de satisfacción: ${avgSatisfaction.toFixed(1)}/5 (${satisfactionScores.length} evaluaciones)`)
-    }
+         // Resumen de satisfacción si está disponible
+     const satisfactionScores = conversations
+       .map(c => c.metadata?.satisfaction)
+       .filter((s): s is number => s !== undefined && s > 0)
+     
+     if (satisfactionScores.length > 0) {
+       const avgSatisfaction = satisfactionScores.reduce((sum, score) => sum + score, 0) / satisfactionScores.length
+       summary.push(`• Promedio de satisfacción: ${avgSatisfaction.toFixed(1)}/5 (${satisfactionScores.length} evaluaciones)`)
+     }
 
     return summary
   }
