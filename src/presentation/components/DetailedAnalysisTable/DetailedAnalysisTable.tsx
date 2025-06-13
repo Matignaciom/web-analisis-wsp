@@ -44,25 +44,27 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     autoUpdate: false
   })
 
-  // 🔍 FUNCIÓN PARA DETECTAR VENTAS COMPLETADAS (MISMA LÓGICA QUE MÉTRICAS)
+  // 🔍 FUNCIÓN PARA DETECTAR VENTAS COMPLETADAS (CRITERIO CONSERVADOR)
   const isCompletedSale = useCallback((conv: Conversation): boolean => {
-    // 1. Verificar status explícitos de venta (misma lógica que DynamicMetricsService)
+    // 1. Verificar status explícitos de venta ÚNICAMENTE
     const salesStatuses = ['completed', 'completado', 'finalizado', 'vendido', 'venta', 'exitoso', 'won', 'closed-won']
     if (salesStatuses.includes(conv.status.toLowerCase())) {
       return true
     }
     
-    // 2. Detectar indicadores de venta en mensajes
+    // 2. Detectar indicadores MUY ESPECÍFICOS de venta en mensajes
     const lastMsg = conv.lastMessage?.toLowerCase() || ''
-    const salesKeywords = ['compra', 'comprar', 'venta', 'vendido', 'pago', 'transferencia', 'factura', 'entrega', 'envío']
-    if (salesKeywords.some(keyword => lastMsg.includes(keyword))) {
+    const specificSalesKeywords = [
+      'vendido', 'venta completada', 'pago realizado', 'pago confirmado', 
+      'transferencia realizada', 'factura pagada', 'entrega realizada', 
+      'pedido entregado', 'gracias por la compra', 'compra exitosa'
+    ]
+    if (specificSalesKeywords.some(keyword => lastMsg.includes(keyword))) {
       return true
     }
     
-    // 3. Detectar por alto número de mensajes con alta satisfacción
-    if (conv.totalMessages > 10 && conv.metadata?.satisfaction && conv.metadata.satisfaction >= 4) {
-      return true
-    }
+    // 3. NO usar número de mensajes como indicador de venta (CRITERIO ELIMINADO)
+    // Solo contar ventas con evidencia clara y explícita
     
     return false
   }, [])

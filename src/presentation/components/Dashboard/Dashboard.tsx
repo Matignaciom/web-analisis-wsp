@@ -207,18 +207,59 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
-  conversations = [],
-  isLoading: propIsLoading = false
+  conversations = []
 }) => {
-  // Usar el hook para generar dashboard dinámico basado en IA
-  const { dashboard, isLoading: dashboardLoading, error } = useDynamicDashboard({
+  const { dashboard, isLoading, error } = useDynamicDashboard({
     conversations,
     autoUpdate: true
   })
 
-  const isLoading = propIsLoading || dashboardLoading
+  // 🔍 FUNCIÓN DE DEPURACIÓN PARA VENTAS
+  const debugSalesCount = () => {
+    if (conversations.length === 0) return
+    
+    let salesCount = 0
+    const salesReasons: string[] = []
+    
+    conversations.forEach((conv, index) => {
+      const salesStatuses = ['completed', 'completado', 'finalizado', 'vendido', 'venta', 'exitoso', 'won', 'closed-won']
+      const lastMsg = conv.lastMessage?.toLowerCase() || ''
+      const specificSalesKeywords = [
+        'vendido', 'venta completada', 'pago realizado', 'pago confirmado', 
+        'transferencia realizada', 'factura pagada', 'entrega realizada', 
+        'pedido entregado', 'gracias por la compra', 'compra exitosa'
+      ]
+      
+      let isSale = false
+      let reason = ''
+      
+      if (salesStatuses.includes(conv.status.toLowerCase())) {
+        isSale = true
+        reason = `Status: ${conv.status}`
+      } else if (specificSalesKeywords.some(keyword => lastMsg.includes(keyword))) {
+        isSale = true
+        reason = `Mensaje: "${conv.lastMessage}"`
+      }
+      
+      if (isSale) {
+        salesCount++
+        salesReasons.push(`Conversación ${index + 1} (${conv.customerName}): ${reason}`)
+      }
+    })
+    
+    console.log('🔍 DEBUG - Análisis de ventas:')
+    console.log(`Total conversaciones: ${conversations.length}`)
+    console.log(`Ventas detectadas: ${salesCount}`)
+    console.log('Razones específicas:', salesReasons)
+    
+    // Mostrar alerta con la información
+    if (salesReasons.length > 0) {
+      alert(`DEPURACIÓN DE VENTAS:\n\nTotal: ${salesCount} de ${conversations.length} conversaciones\n\nMotivos:\n${salesReasons.join('\n')}`)
+    } else {
+      alert(`DEPURACIÓN DE VENTAS:\n\nNo se detectaron ventas con los criterios conservadores.\nTotal conversaciones analizadas: ${conversations.length}`)
+    }
+  }
 
-  // Función para renderizar métricas dinámicas con información de trazabilidad
   const renderDynamicMetric = (metric: DynamicMetric) => {
     const getIconForMetric = (iconString?: string) => {
       // Si no hay icono específico, usar uno por defecto basado en el tipo
@@ -427,7 +468,40 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className={styles.dashboard}>
-
+      {/* Header con botón de depuración */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h2 className={styles.dashboardTitle}>
+          📊 Dashboard Inteligente - Análisis WhatsApp
+        </h2>
+        {conversations.length > 0 && (
+          <button 
+            onClick={debugSalesCount}
+            style={{
+              backgroundColor: '#3b82f6',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '12px 20px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = '#2563eb'
+              e.currentTarget.style.transform = 'translateY(-1px)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = '#3b82f6'
+              e.currentTarget.style.transform = 'translateY(0)'
+            }}
+            title="Ver exactamente qué conversaciones están siendo contadas como ventas"
+          >
+            🔍 Depurar Contador de Ventas
+          </button>
+        )}
+      </div>
 
       {/* Insights generados por IA con información de origen */}
       <div className={styles.aiContentSection}>

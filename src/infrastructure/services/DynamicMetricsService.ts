@@ -347,7 +347,7 @@ export class DynamicMetricsService {
     const patterns: string[] = []
     
     conversations.forEach(conv => {
-      // 1. Verificar status explícitos de venta
+      // 1. Verificar status explícitos de venta ÚNICAMENTE
       const salesStatuses = ['completed', 'completado', 'finalizado', 'vendido', 'venta', 'exitoso', 'won', 'closed-won']
       if (salesStatuses.includes(conv.status.toLowerCase())) {
         salesCount++
@@ -355,23 +355,28 @@ export class DynamicMetricsService {
         return
       }
       
-      // 2. Detectar indicadores de venta en mensajes
+      // 2. Detectar indicadores MUY ESPECÍFICOS de venta en mensajes
       const lastMsg = conv.lastMessage?.toLowerCase() || ''
-      const salesKeywords = ['compra', 'comprar', 'venta', 'vendido', 'pago', 'transferencia', 'factura', 'entrega', 'envío']
-      if (salesKeywords.some(keyword => lastMsg.includes(keyword))) {
+      const specificSalesKeywords = [
+        'vendido', 'venta completada', 'pago realizado', 'pago confirmado', 
+        'transferencia realizada', 'factura pagada', 'entrega realizada', 
+        'pedido entregado', 'gracias por la compra', 'compra exitosa'
+      ]
+      if (specificSalesKeywords.some(keyword => lastMsg.includes(keyword))) {
         salesCount++
-        patterns.push('Indicadores en último mensaje')
+        patterns.push('Confirmación específica de venta en mensaje')
         return
       }
       
       // 3. NO usar metadata de compra automática (podría ser inventada)
-      
-      // 4. Detectar por alto número de mensajes (indicador de engagement exitoso)
-      if (conv.totalMessages > 10 && conv.metadata?.satisfaction && conv.metadata.satisfaction >= 4) {
-        salesCount++
-        patterns.push('Alto engagement + alta satisfacción')
-        return
-      }
+      // 4. NO usar número de mensajes como indicador de venta (CRITERIO ELIMINADO)
+      // Solo contar ventas con evidencia clara y explícita
+    })
+    
+    console.log('🔍 Análisis de ventas conservador:', {
+      totalConversaciones: conversations.length,
+      ventasDetectadas: salesCount,
+      patronesEncontrados: patterns
     })
     
     return { count: salesCount, patterns: [...new Set(patterns)] }
