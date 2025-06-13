@@ -168,10 +168,11 @@
 
 .dynamicGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: clamp(1rem, 2.5vw, 1.5rem);
   margin-top: 1.5rem;
   max-width: 100%;
+  align-items: stretch; /* Hace que todas las tarjetas tengan la misma altura */
 }
 
 .dynamicCard {
@@ -182,31 +183,48 @@
   transition: all 0.3s ease;
   text-align: center;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-  min-height: 120px;
+  height: 180px; /* Altura fija para uniformidad */
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between; /* Distribuye el contenido uniformemente */
   align-items: center;
+  position: relative;
+  overflow: hidden;
 }
 
 .dynamicTitle {
   font-size: clamp(0.875rem, 2vw, 1rem);
   font-weight: 600;
   color: #6b7280;
-  margin: 0 0 0.5rem 0;
+  margin: 0;
+  text-align: center;
+  line-height: 1.3;
+  flex-shrink: 0;
+  padding: 0 8px;
 }
 
 .dynamicValue {
-  font-size: clamp(1.25rem, 3vw, 1.5rem);
-  font-weight: 700;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
   color: #000000;
-  margin: 0 0 0.25rem 0;
+  margin: 0;
+  text-align: center;
+  line-height: 1.1;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .dynamicCategory {
   font-size: clamp(0.75rem, 1.5vw, 0.875rem);
   color: #6b7280;
   font-weight: 500;
+  margin: 0;
+  text-align: center;
+  line-height: 1.2;
+  flex-shrink: 0;
+  padding: 0 8px;
 }
 
 .sectionTitle {
@@ -360,8 +378,12 @@
   }
   
   .dynamicGrid {
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 1.25rem;
+  }
+  
+  .dynamicCard {
+    height: 160px; /* Altura ligeramente menor en tablets */
   }
 }
 
@@ -402,6 +424,10 @@
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 1rem;
   }
+  
+  .dynamicCard {
+    height: 150px; /* Altura menor en móviles */
+  }
 }
 
 @media (max-width: 640px) {
@@ -420,6 +446,11 @@
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 0.875rem;
   }
+  
+  .dynamicCard {
+    height: 140px; /* Altura aún menor en pantallas pequeñas */
+    padding: 0.875rem;
+  }
 }
 
 @media (max-width: 480px) {
@@ -434,6 +465,15 @@
   .dynamicGrid {
     grid-template-columns: 1fr;
     gap: 0.75rem;
+  }
+  
+  .dynamicCard {
+    height: 130px; /* Altura mínima para móviles muy pequeños */
+    padding: 0.75rem;
+  }
+  
+  .dynamicValue {
+    font-size: clamp(1.25rem, 6vw, 1.5rem);
   }
 }
 

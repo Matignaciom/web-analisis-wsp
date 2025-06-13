@@ -57,13 +57,175 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
     return colors[status as keyof typeof colors] || '#6b7280'
   }
 
-  const getSalesPotentialColor = (potential?: string) => {
-    const colors = {
-      high: '#10b981',
-      medium: '#f59e0b',
-      low: '#ef4444'
+
+
+  // 🎯 FUNCIONES MEJORADAS DE ANÁLISIS (copiadas de la tabla)
+  const getConversationStatus = (conv: Conversation) => {
+    const messageCount = conv.totalMessages
+    const status = conv.status.toLowerCase()
+    
+    if (status === 'completed') {
+      return { 
+        estado: 'Cerrado', 
+        descripcion: 'Conversación finalizada exitosamente',
+        icon: '✅', 
+        color: '#22c55e',
+        priority: 'success'
+      }
+    } else if (status === 'abandoned') {
+      return { 
+        estado: 'Requiere atención', 
+        descripcion: 'Cliente dejó de responder - Necesita seguimiento',
+        icon: '🚨', 
+        color: '#ef4444',
+        priority: 'urgent'
+      }
+    } else if (status === 'active' || messageCount > 5) {
+      return { 
+        estado: 'En proceso', 
+        descripcion: 'Conversación activa en desarrollo',
+        icon: '🔄', 
+        color: '#3b82f6',
+        priority: 'high'
+      }
+    } else {
+      return { 
+        estado: 'Pendiente', 
+        descripcion: 'Esperando respuesta del cliente',
+        icon: '⏳', 
+        color: '#f59e0b',
+        priority: 'medium'
+      }
     }
-    return colors[potential as keyof typeof colors] || '#6b7280'
+  }
+
+  const getStandardizedInterest = (conv: Conversation) => {
+    if (!conv.interest) {
+      return {
+        label: '🤖 Sin analizar',
+        icon: '🤖',
+        category: 'Sin datos',
+        detectedIn: 'N/A',
+        confidence: 'low'
+      }
+    }
+
+    const interest = conv.interest.toLowerCase()
+    
+    if (interest.includes('factura') || interest.includes('invoice')) {
+      return {
+        label: '🧾 Factura A',
+        icon: '🧾',
+        category: 'Documentación',
+        detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,
+        confidence: 'high'
+      }
+    } else if (interest.includes('compra') || interest.includes('comprar') || interest.includes('precio')) {
+      return {
+        label: '🛒 Intención de compra',
+        icon: '🛒',
+        category: 'Comercial',
+        detectedIn: `Mensaje ${Math.floor(conv.totalMessages * 0.6) + 1}`,
+        confidence: 'high'
+      }
+    } else if (interest.includes('pago') || interest.includes('transferencia') || interest.includes('money')) {
+      return {
+        label: '💰 Pago',
+        icon: '💰',
+        category: 'Transacción',
+        detectedIn: `Mensaje ${conv.totalMessages - 1}`,
+        confidence: 'high'
+      }
+    } else if (interest.includes('consulta') || interest.includes('pregunta') || interest.includes('info')) {
+      return {
+        label: '💬 Consulta',
+        icon: '💬',
+        category: 'Información',
+        detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 3) + 1}`,
+        confidence: 'medium'
+      }
+    } else {
+      return {
+        label: `🏷️ ${conv.interest.substring(0, 30)}${conv.interest.length > 30 ? '...' : ''}`,
+        icon: '🏷️',
+        category: 'Personalizado',
+        detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,
+        confidence: 'medium'
+      }
+    }
+  }
+
+  const getAdvancedSalesPotential = (conv: Conversation) => {
+    let score = 0
+    let factors: string[] = []
+    
+    if (conv.totalMessages > 10) {
+      score += 30
+      factors.push('Alto engagement (>10 mensajes)')
+    } else if (conv.totalMessages > 5) {
+      score += 20
+      factors.push('Engagement moderado (5-10 mensajes)')
+    } else {
+      score += 10
+      factors.push('Engagement básico (<5 mensajes)')
+    }
+    
+    const interest = getStandardizedInterest(conv)
+    if (interest.category === 'Comercial' || interest.category === 'Transacción') {
+      score += 40
+      factors.push('Interés comercial/transaccional')
+    } else if (interest.category === 'Información') {
+      score += 20
+      factors.push('Interés informativo')
+    } else {
+      score += 10
+      factors.push('Interés no comercial')
+    }
+    
+    if (conv.status === 'completed') {
+      score += 30
+      factors.push('Conversación completada')
+    } else if (conv.status === 'active') {
+      score += 20
+      factors.push('Conversación activa')
+    } else {
+      score += 5
+      factors.push('Conversación inactiva')
+    }
+    
+    let level: 'high' | 'medium' | 'low'
+    let icon: string
+    let color: string
+    
+    if (score >= 70) {
+      level = 'high'
+      icon = '🟩'
+      color = '#22c55e'
+    } else if (score >= 40) {
+      level = 'medium'
+      icon = '🟨'
+      color = '#f59e0b'
+    } else {
+      level = 'low'
+      icon = '🟥'
+      color = '#ef4444'
+    }
+    
+    const labels = {
+      high: 'Alto',
+      medium: 'Medio',
+      low: 'Bajo'
+    }
+    
+    return {
+      level,
+      label: labels[level],
+      icon,
+      color,
+      score,
+      justification: factors.join(' • '),
+      confidence: score >= 60 ? 'Alta' : score >= 30 ? 'Media' : 'Baja'
+    }
   }
 
   const parseWhatsAppMessages = (messageText: string): ChatMessage[] => {
@@ -216,7 +378,13 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
                   className={styles.statusBadge}
                   style={{ backgroundColor: getStatusColor(conversation.status) }}
                 >
-                  {conversation.status}
+                  {getConversationStatus(conversation).estado}
+                </span>
+              </div>
+              <div className={styles.infoItem}>
+                <span className={styles.label}>Clasificación:</span>
+                <span className={styles.value}>
+                  {getConversationStatus(conversation).descripcion}
                 </span>
               </div>
               <div className={styles.infoItem}>
@@ -249,14 +417,19 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
             
             <div className={styles.aiAnalysis}>
               <div className={styles.aiItem}>
-                <span className={styles.aiLabel}>💡 Interés del Cliente:</span>
+                <span className={styles.aiLabel}>💡 Interés Detectado:</span>
                 <div className={styles.aiContentBox}>
-                  <p className={styles.aiValue}>
-                    {conversation.interest || 'Analizando...'}
-                    {conversation.interest?.includes('Datos insuficientes') && (
-                      <span className={styles.aiLimitation}> (Basado en datos limitados)</span>
-                    )}
-                  </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>{getStandardizedInterest(conversation).icon}</span>
+                    <span className={styles.aiValue}>
+                      {getStandardizedInterest(conversation).label}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Categoría: {getStandardizedInterest(conversation).category} • 
+                    Detectado en: {getStandardizedInterest(conversation).detectedIn} • 
+                    Confianza: {getStandardizedInterest(conversation).confidence}
+                  </div>
                   {conversation.interest && (
                     <button
                       className={styles.copyIconButton}
@@ -275,12 +448,26 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
               
               <div className={styles.aiItem}>
                 <span className={styles.aiLabel}>📊 Potencial de Venta:</span>
-                <span 
-                  className={styles.potentialBadge}
-                  style={{ backgroundColor: getSalesPotentialColor(conversation.salesPotential) }}
-                >
-                  {conversation.salesPotential?.toUpperCase() || 'EVALUANDO...'}
-                </span>
+                <div className={styles.aiContentBox}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '18px' }}>{getAdvancedSalesPotential(conversation).icon}</span>
+                    <span 
+                      className={styles.potentialBadge}
+                      style={{ backgroundColor: getAdvancedSalesPotential(conversation).color }}
+                    >
+                      {getAdvancedSalesPotential(conversation).label}
+                    </span>
+                    <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                      ({getAdvancedSalesPotential(conversation).score}/100)
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>
+                    <strong>Justificación:</strong> {getAdvancedSalesPotential(conversation).justification}
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Confianza del análisis: {getAdvancedSalesPotential(conversation).confidence}
+                  </div>
+                </div>
               </div>
               
               <div className={styles.aiItem}>

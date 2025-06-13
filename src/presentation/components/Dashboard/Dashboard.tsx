@@ -128,6 +128,41 @@ const CopyableAIText: React.FC<CopyableAITextProps> = ({ text, label, source }) 
     }
   }
 
+  // 🎯 FUNCIÓN PARA RENDERIZAR LISTAS CORRECTAMENTE
+  const renderTextContent = (text: string) => {
+    // Si el texto contiene viñetas (•), renderizar como lista
+    if (text.includes('• ')) {
+      const items = text.split('• ').filter(item => item.trim().length > 0)
+      
+      return (
+        <ul style={{ 
+          margin: '0', 
+          paddingLeft: '16px', 
+          listStyle: 'none',
+          lineHeight: '1.6'
+        }}>
+          {items.map((item, index) => (
+            <li key={index} style={{ 
+              marginBottom: '8px',
+              position: 'relative'
+            }}>
+              <span style={{ 
+                position: 'absolute', 
+                left: '-16px', 
+                color: '#3b82f6',
+                fontWeight: 'bold'
+              }}>•</span>
+              {item.trim()}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    
+    // Si no tiene viñetas, renderizar como párrafo normal
+    return <p className={styles.aiGeneratedText}>{text}</p>
+  }
+
   return (
     <div className={styles.copyableContainer}>
       <div className={styles.aiSourceIndicator}>
@@ -136,7 +171,9 @@ const CopyableAIText: React.FC<CopyableAITextProps> = ({ text, label, source }) 
       </div>
       <div className={styles.copyableText}>
         <span className={styles.textLabel}>{label}:</span>
-        <p className={styles.aiGeneratedText}>{text}</p>
+        <div className={styles.aiGeneratedText}>
+          {renderTextContent(text)}
+        </div>
         <button 
           onClick={copyToClipboard}
           className={`${styles.copyButton} ${copied ? styles.copied : ''}`}
@@ -181,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const isLoading = propIsLoading || dashboardLoading
 
-  // Función para renderizar métricas dinámicas
+  // Función para renderizar métricas dinámicas con información de trazabilidad
   const renderDynamicMetric = (metric: DynamicMetric) => {
     const getIconForMetric = (iconString?: string) => {
       // Si no hay icono específico, usar uno por defecto basado en el tipo
@@ -211,16 +248,146 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     }
 
+    // ✅ Crear subtítulo con información de trazabilidad
+    const getTraceabilitySubtitle = (metric: DynamicMetric): string => {
+      const sourceLabels = {
+        'excel_direct': '📊 Del Excel',
+        'ai_inference': '🤖 Inferido por IA',
+        'calculated': '📐 Calculado',
+        'simulated': '⚠️ Simulado'
+      }
+      
+      const confidenceLabels = {
+        'high': '✅',
+        'medium': '⚖️',
+        'low': '⚠️'
+      }
+      
+      const sourceLabel = sourceLabels[metric.dataSource] || metric.dataSource
+      const confidenceIcon = confidenceLabels[metric.traceability.confidence]
+      
+      return `${sourceLabel} ${confidenceIcon} | ${metric.category || 'General'}`
+    }
+
+    // ✅ Mostrar advertencias si existen
+    const subtitle = getTraceabilitySubtitle(metric)
+    const hasWarnings = metric.traceability.warnings && metric.traceability.warnings.length > 0
+
+    // ✅ Crear tooltip detallado con información completa
+    const createDetailedTooltip = (metric: DynamicMetric): string => {
+      const parts = [
+        `📊 MÉTRICA: ${metric.title}`,
+        `💡 VALOR: ${metric.value}`,
+        `🔍 TIPO: ${metric.isObjective ? 'Objetiva (datos directos)' : 'Inferida (estimación)'}`,
+        `📋 CATEGORÍA: ${metric.category || 'General'}`,
+        `📊 ORIGEN: ${metric.dataSource === 'excel_direct' ? 'Extraído del Excel' : 
+                     metric.dataSource === 'calculated' ? 'Calculado matemáticamente' :
+                     metric.dataSource === 'ai_inference' ? 'Inferido por IA' : 'Simulado'}`,
+        `🎯 CONFIANZA: ${metric.traceability.confidence === 'high' ? 'Alta (>90%)' :
+                        metric.traceability.confidence === 'medium' ? 'Media (70-90%)' : 'Baja (<70%)'}`,
+        `📍 CAMPOS USADOS: ${metric.traceability.originFields.join(', ') || 'No especificado'}`,
+        `🔢 MÉTODO: ${metric.traceability.calculationMethod || 'Análisis directo'}`
+      ]
+      
+      if (metric.traceability.warnings && metric.traceability.warnings.length > 0) {
+        parts.push(`⚠️ ADVERTENCIAS: ${metric.traceability.warnings.join('; ')}`)
+      }
+      
+      return parts.join('\n')
+    }
+
     return (
-      <MetricCard
-        key={`dynamic-${metric.title}`}
-        title={metric.title}
-        value={metric.value}
-        icon={getIconForMetric(metric.icon)}
-        color={getColorForCategory(metric.category)}
-        trend={metric.trend}
-        subtitle={metric.category}
-      />
+      <div 
+        key={`dynamic-${metric.title}`} 
+        style={{ position: 'relative' }}
+        title={createDetailedTooltip(metric)}
+      >
+        <div style={{ 
+          cursor: 'help',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'translateY(-2px)'
+          e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.15)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)'
+          e.currentTarget.style.boxShadow = 'none'
+        }}>
+          <MetricCard
+            title={metric.title}
+            value={metric.value}
+            icon={getIconForMetric(metric.icon)}
+            color={getColorForCategory(metric.category)}
+            trend={metric.trend}
+            subtitle={subtitle}
+          />
+        </div>
+        
+        {/* ✅ Indicador de tipo de métrica */}
+        <div style={{
+          position: 'absolute',
+          top: '8px',
+          left: '8px',
+          background: metric.isObjective ? '#dcfce7' : '#fef3c7',
+          border: `1px solid ${metric.isObjective ? '#16a34a' : '#f59e0b'}`,
+          borderRadius: '12px',
+          padding: '2px 6px',
+          fontSize: '9px',
+          fontWeight: 'bold',
+          color: metric.isObjective ? '#15803d' : '#92400e',
+          zIndex: 1,
+          cursor: 'help'
+        }} title={metric.isObjective ? 'Métrica Objetiva: Basada en datos directos del Excel' : 'Métrica Inferida: Estimación basada en análisis'}>
+          {metric.isObjective ? '📊' : '🔮'}
+        </div>
+
+        {/* ✅ Mostrar advertencias si existen */}
+        {hasWarnings && (
+          <div style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            background: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '4px',
+            padding: '2px 6px',
+            fontSize: '10px',
+            color: '#92400e',
+            zIndex: 1,
+            cursor: 'help'
+          }} title={`⚠️ ADVERTENCIAS:\n${metric.traceability.warnings?.join('\n• ')}`}>
+            ⚠️
+          </div>
+        )}
+
+        {/* ✅ Indicador de nivel de confianza */}
+        <div style={{
+          position: 'absolute',
+          bottom: '8px',
+          right: '8px',
+          background: metric.traceability.confidence === 'high' ? '#dcfce7' : 
+                     metric.traceability.confidence === 'medium' ? '#fef3c7' : '#fee2e2',
+          border: `1px solid ${metric.traceability.confidence === 'high' ? '#16a34a' : 
+                                metric.traceability.confidence === 'medium' ? '#f59e0b' : '#ef4444'}`,
+          borderRadius: '50%',
+          width: '16px',
+          height: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '8px',
+          fontWeight: 'bold',
+          color: metric.traceability.confidence === 'high' ? '#15803d' : 
+                 metric.traceability.confidence === 'medium' ? '#92400e' : '#dc2626',
+          zIndex: 1,
+          cursor: 'help'
+        }} title={`Nivel de Confianza: ${metric.traceability.confidence === 'high' ? 'Alto (>90%)' :
+                                        metric.traceability.confidence === 'medium' ? 'Medio (70-90%)' : 'Bajo (<70%)'}`}>
+          {metric.traceability.confidence === 'high' ? '✓' : 
+           metric.traceability.confidence === 'medium' ? '~' : '!'}
+        </div>
+      </div>
     )
   }
 
@@ -260,28 +427,35 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className={styles.dashboard}>
-      {/* Insights generados por IA */}
+
+
+      {/* Insights generados por IA con información de origen */}
       <div className={styles.aiContentSection}>
+        <div style={{ textAlign: 'center', marginBottom: '12px', fontSize: '12px', color: '#6b7280' }}>
+          📊 Origen de datos: {insights.dataSourceBreakdown.directFromExcel}% Excel • 
+          🤖 {insights.dataSourceBreakdown.aiInferred}% IA • 
+          📐 {insights.dataSourceBreakdown.calculated}% Calculado
+        </div>
         <div className={styles.aiContentGrid}>
           <CopyableAIText 
             text={insights.summary}
-            label="Resumen de Datos"
+            label="📄 Resumen General"
             source="ai-summary"
           />
           <CopyableAIText 
-            text={insights.keyFindings.join(" • ")}
-            label="Hallazgos Clave"
+            text={insights.keyFindings.join("")}
+            label="🔍 Patrones Encontrados"
             source="ai-insight"
           />
           <CopyableAIText 
-            text={insights.recommendations.join(" • ")}
-            label="Recomendaciones"
+            text={insights.recommendations.join("")}
+            label="📊 Resumen de Datos"
             source="ai-recommendation"
           />
         </div>
       </div>
 
-      {/* Métricas principales extraídas 100% del Excel */}
+      {/* Métricas principales extraídas del Excel con trazabilidad */}
       <div className={styles.metricsGrid}>
         {/* SIEMPRE mostrar métricas básicas ya que vienen del Excel */}
         <MetricCard
@@ -289,7 +463,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           value={mainMetrics.totalConversations.toLocaleString()}
           icon={<Users size={24} />}
           color="blue"
-          subtitle="Del archivo Excel cargado"
+          subtitle="📊 Del Excel ✅ | Conteo directo"
         />
         
         <MetricCard
@@ -297,7 +471,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           value={mainMetrics.completedSales.toLocaleString()}
           icon={<CheckCircle size={24} />}
           color="green"
-          subtitle={`${((mainMetrics.completedSales / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
+          subtitle={`📊 Del Excel ⚖️ | ${((mainMetrics.completedSales / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
         />
         
         <MetricCard
@@ -305,7 +479,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           value={mainMetrics.abandonedChats.toLocaleString()}
           icon={<XCircle size={24} />}
           color="red"
-          subtitle={`${((mainMetrics.abandonedChats / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
+          subtitle={`📊 Del Excel ⚖️ | ${((mainMetrics.abandonedChats / mainMetrics.totalConversations) * 100).toFixed(1)}% del total`}
         />
         
         <MetricCard
@@ -313,7 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           value={mainMetrics.averageResponseTime}
           icon={<Clock size={24} />}
           color="yellow"
-          subtitle="Calculado desde datos reales"
+          subtitle={mainMetrics.averageResponseTime.includes('estimado') ? "📐 Calculado ⚠️ | Estimado" : "📊 Del Excel ✅ | Directo"}
         />
 
         <MetricCard
@@ -321,7 +495,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           value={`${mainMetrics.conversionRate.toFixed(1)}%`}
           icon={<Target size={24} />}
           color="purple"
-          subtitle="Basado en estados del Excel"
+          subtitle="📐 Calculado ✅ | Estados del Excel"
         />
 
         {/* Solo mostrar satisfacción si hay datos reales */}
@@ -331,23 +505,106 @@ const Dashboard: React.FC<DashboardProps> = ({
             value={`${mainMetrics.satisfactionScore.toFixed(1)}/5`}
             icon={<MessageSquare size={24} />}
             color="green"
-            subtitle="Datos disponibles en Excel"
+            subtitle="📊 Del Excel ✅ | Datos disponibles"
           />
         )}
       </div>
 
-      {/* Análisis Avanzado de Datos - Siempre generado dinámicamente si hay datos */}
+      {/* Análisis Avanzado de Datos - Separado por tipos de métricas */}
       {dynamicMetrics && dynamicMetrics.length > 0 && conversations.length > 0 && (
         <div className={styles.dynamicSection}>
           <h3 className={styles.sectionTitle} style={{ color: '#1e293b' }}>
             📈 Análisis Avanzado de Datos
           </h3>
           <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '16px', textAlign: 'center' }}>
-            Métricas inteligentes generadas automáticamente basadas en el análisis de tus conversaciones
+            Métricas avanzadas con trazabilidad completa al Excel original
           </p>
-          <div className={styles.dynamicGrid}>
-            {dynamicMetrics.map((metric) => renderDynamicMetric(metric))}
+
+          {/* Panel Informativo Detallado */}
+          <div style={{ 
+            background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)', 
+            border: '2px solid #3b82f6', 
+            borderRadius: '12px', 
+            padding: '20px', 
+            marginBottom: '24px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '24px', marginRight: '12px' }}>ℹ️</div>
+              <h4 style={{ color: '#1e40af', fontSize: '18px', fontWeight: 'bold', margin: 0 }}>
+                Guía del Análisis Avanzado
+              </h4>
+            </div>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+              gap: '16px',
+              marginBottom: '16px'
+            }}>
+              <div style={{ 
+                background: '#ffffff', 
+                padding: '16px', 
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb'
+              }}>
+                <h5 style={{ color: '#16a34a', fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+                  📊 Métricas Objetivas
+                </h5>
+                <p style={{ fontSize: '12px', color: '#374151', lineHeight: '1.4', margin: 0 }}>
+                  • <strong>Datos directos:</strong> Extraídos tal como aparecen en el Excel<br/>
+                  • <strong>Cálculos exactos:</strong> Operaciones matemáticas sobre datos reales<br/>
+                  • <strong>100% confiables:</strong> Sin estimaciones ni suposiciones<br/>
+                  • <strong>Trazabilidad:</strong> Cada valor referencia su celda original
+                </p>
+              </div>
+
+              <div style={{ 
+                background: '#ffffff', 
+                padding: '16px', 
+                borderRadius: '8px',
+                border: '1px solid #e5e7eb'
+              }}>
+                <h5 style={{ color: '#f59e0b', fontSize: '14px', fontWeight: 'bold', marginBottom: '8px' }}>
+                  🔮 Métricas Inferidas
+                </h5>
+                <p style={{ fontSize: '12px', color: '#374151', lineHeight: '1.4', margin: 0 }}>
+                  • <strong>Estimaciones inteligentes:</strong> Basadas en patrones detectados<br/>
+                  • <strong>Análisis de tendencias:</strong> Proyecciones y correlaciones<br/>
+                  • <strong>Nivel de confianza:</strong> Indicado en cada métrica<br/>
+                  • <strong>Advertencias:</strong> Cuando los datos son limitados
+                </p>
+              </div>
+            </div>
+
+
           </div>
+
+          {/* ✅ Métricas Objetivas (Datos directos del Excel) */}
+          {dynamicMetrics.filter(m => m.isObjective).length > 0 && (
+            <>
+              <h4 style={{ color: '#16a34a', fontSize: '16px', fontWeight: 'bold', marginTop: '20px', marginBottom: '12px' }}>
+                📊 Métricas Objetivas (Basadas en datos del Excel)
+              </h4>
+
+              <div className={styles.dynamicGrid}>
+                {dynamicMetrics.filter(m => m.isObjective).map((metric) => renderDynamicMetric(metric))}
+              </div>
+            </>
+          )}
+
+          {/* ⚠️ Métricas Inferidas (Estimaciones y cálculos avanzados) */}
+          {dynamicMetrics.filter(m => !m.isObjective).length > 0 && (
+            <>
+              <h4 style={{ color: '#f59e0b', fontSize: '16px', fontWeight: 'bold', marginTop: '20px', marginBottom: '12px' }}>
+                🔮 Métricas Inferidas (Estimaciones y análisis avanzado)
+              </h4>
+
+              <div className={styles.dynamicGrid}>
+                {dynamicMetrics.filter(m => !m.isObjective).map((metric) => renderDynamicMetric(metric))}
+              </div>
+            </>
+          )}
         </div>
       )}
 

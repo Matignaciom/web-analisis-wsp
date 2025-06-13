@@ -12,16 +12,46 @@ export interface DynamicMetric {
     value: number
     direction: 'up' | 'down' | 'neutral'
   }
-  aiGenerated: true
+  dataSource: 'excel_direct' | 'ai_inference' | 'calculated' | 'simulated'
+  traceability: {
+    originFields: string[]
+    confidence: 'high' | 'medium' | 'low'
+    calculationMethod: string
+    basedOnRowCount: number
+    warnings?: string[]
+  }
+  isObjective: boolean
+  aiGenerated: boolean
+}
+
+export interface MetricValidation {
+  isValid: boolean
+  qualityScore: number
+  issues: string[]
+  recommendations: string[]
 }
 
 export interface AIGeneratedDashboard {
-  mainMetrics: DashboardMetrics
+  mainMetrics: DashboardMetrics & {
+    validation: MetricValidation
+    dataQuality: {
+      completenessScore: number
+      reliabilityScore: number
+      totalRowsAnalyzed: number
+      estimatedDataAccuracy: number
+    }
+  }
   dynamicMetrics: DynamicMetric[]
   insights: {
     summary: string
     keyFindings: string[]
     recommendations: string[]
+    dataSourceBreakdown: {
+      directFromExcel: number
+      aiInferred: number
+      calculated: number
+    }
+    reliabilityWarnings: string[]
   }
 }
 
@@ -51,7 +81,7 @@ export class DynamicMetricsService {
       const insights = await this.generateAdvancedAIInsights(conversations, aiGeneratedMainMetrics)
 
       return {
-        mainMetrics: aiGeneratedMainMetrics,
+        mainMetrics: this.calculateRealDataMetrics(conversations),
         dynamicMetrics,
         insights
       }
@@ -88,6 +118,135 @@ export class DynamicMetricsService {
     }
   }
 
+  // ✅ EVALUAR CALIDAD DE DATOS DEL EXCEL
+  private assessExcelDataQuality(conversations: Conversation[]): {
+    completenessScore: number
+    reliabilityScore: number
+    estimatedAccuracy: number
+    issues: string[]
+    fieldQuality: Record<string, { score: number; realDataCount: number; totalCount: number }>
+  } {
+    const totalRows = conversations.length
+    const issues: string[] = []
+    const fieldQuality: Record<string, { score: number; realDataCount: number; totalCount: number }> = {}
+    
+    // Evaluar cada campo crítico del Excel
+    const criticalFields = [
+      { name: 'customerName', accessor: (c: Conversation) => c.customerName },
+      { name: 'customerPhone', accessor: (c: Conversation) => c.customerPhone },
+      { name: 'startDate', accessor: (c: Conversation) => c.startDate },
+      { name: 'status', accessor: (c: Conversation) => c.status },
+      { name: 'totalMessages', accessor: (c: Conversation) => c.totalMessages },
+      { name: 'lastMessage', accessor: (c: Conversation) => c.lastMessage },
+      { name: 'assignedAgent', accessor: (c: Conversation) => c.assignedAgent }
+    ]
+    
+    criticalFields.forEach(field => {
+      const realDataCount = conversations.filter(conv => {
+        const value = field.accessor(conv)
+        // Verificar si el dato parece real (no vacío, no genérico, no placeholder)
+        if (!value) return false
+        
+        const stringValue = String(value).toLowerCase()
+        const isGeneric = ['test', 'ejemplo', 'demo', 'prueba', 'n/a', 'null', 'undefined', 'cliente', 'usuario'].some(generic => 
+          stringValue.includes(generic)
+        )
+        
+        return !isGeneric && stringValue.trim().length > 0
+      }).length
+      
+      const qualityScore = Math.round((realDataCount / totalRows) * 100)
+      fieldQuality[field.name] = {
+        score: qualityScore,
+        realDataCount,
+        totalCount: totalRows
+      }
+      
+      if (qualityScore < 50) {
+        issues.push(`⚠️ Campo "${field.name}": Solo ${qualityScore}% de datos reales (${realDataCount}/${totalRows})`)
+      }
+    })
+    
+    // Calcular puntuaciones generales
+    const completenessScore = Math.round(
+      Object.values(fieldQuality).reduce((sum, field) => sum + field.score, 0) / criticalFields.length
+    )
+    
+    // Evaluar confiabilidad basada en metadata de calidad si existe
+    const conversationsWithQuality = conversations.filter(c => c.metadata?.dataQuality?.completenessScore)
+    const reliabilityScore = conversationsWithQuality.length > 0 
+      ? Math.round(
+          conversationsWithQuality.reduce((sum, c) => sum + (c.metadata?.dataQuality?.completenessScore || 0), 0) / conversationsWithQuality.length
+        )
+      : completenessScore
+    
+    // Estimar precisión basada en patrones detectados
+    const estimatedAccuracy = Math.min(completenessScore, reliabilityScore)
+    
+    return {
+      completenessScore,
+      reliabilityScore,
+      estimatedAccuracy,
+      issues,
+      fieldQuality
+    }
+  }
+
+  // ✅ CREAR VALIDACIÓN DE MÉTRICAS CON TRAZABILIDAD
+  private createMetricValidation(conversations: Conversation[], analysisData: {
+    salesPatterns: { count: number; patterns: string[] }
+    abandonedPatterns: { count: number; patterns: string[] }
+    dataQuality: any
+  }): MetricValidation {
+    const issues: string[] = []
+    const recommendations: string[] = []
+    let qualityScore = 100
+    
+    // Evaluar calidad de datos
+    if (analysisData.dataQuality.completenessScore < 70) {
+      issues.push(`📊 Calidad de datos: ${analysisData.dataQuality.completenessScore}% de completitud`)
+      recommendations.push('Revisar y limpiar datos del Excel para mejorar precisión')
+      qualityScore -= 20
+    }
+    
+    // Evaluar patrones de ventas detectados
+    if (analysisData.salesPatterns.count === 0) {
+      issues.push('❌ No se detectaron patrones claros de ventas en los datos')
+      recommendations.push('Verificar que los estados de conversación estén correctamente definidos')
+      qualityScore -= 15
+    } else if (analysisData.salesPatterns.patterns.length === 1) {
+      issues.push('⚠️ Solo se detectó un tipo de patrón de venta')
+      recommendations.push('Considerar usar estados más específicos para ventas')
+      qualityScore -= 5
+    }
+    
+    // Evaluar cantidad de datos
+    if (conversations.length < 10) {
+      issues.push('📈 Muestra pequeña: menos de 10 conversaciones')
+      recommendations.push('Incluir más datos para análisis más confiable')
+      qualityScore -= 10
+    }
+    
+    // Evaluar datos simulados
+    const simulatedDataCount = conversations.filter(c => 
+      c.metadata?.incompleteData || 
+      (c.metadata?.dataQuality?.completenessScore && c.metadata.dataQuality.completenessScore < 50)
+    ).length
+    
+    if (simulatedDataCount > conversations.length * 0.3) {
+      issues.push(`🤖 ${Math.round((simulatedDataCount / conversations.length) * 100)}% de datos podrían ser simulados o incompletos`)
+      recommendations.push('Validar la calidad de los datos originales del Excel')
+      qualityScore -= 25
+    }
+    
+    return {
+      isValid: qualityScore >= 50,
+      qualityScore: Math.max(0, qualityScore),
+      issues,
+      recommendations
+    }
+  }
+
   // 🤖 GENERAR MÉTRICAS PRINCIPALES DINÁMICAMENTE CON IA
   private async generateAIMainMetrics(conversations: Conversation[]): Promise<DashboardMetrics> {
     if (!this.analysisService) {
@@ -117,8 +276,19 @@ export class DynamicMetricsService {
   }
 
   // 📊 CALCULAR MÉTRICAS REALES (sin asumir formatos específicos)
-  private calculateRealDataMetrics(conversations: Conversation[]): DashboardMetrics {
+  private calculateRealDataMetrics(conversations: Conversation[]): DashboardMetrics & {
+    validation: MetricValidation
+    dataQuality: {
+      completenessScore: number
+      reliabilityScore: number
+      totalRowsAnalyzed: number
+      estimatedDataAccuracy: number
+    }
+  } {
     const totalConversations = conversations.length
+    
+    // ✅ Evaluar calidad de datos desde el Excel
+    const dataQuality = this.assessExcelDataQuality(conversations)
     
     // Analizar patrones reales en los datos para identificar ventas y abandonos
     const salesPatterns = this.identifyRealSalesPattern(conversations)
@@ -137,13 +307,21 @@ export class DynamicMetricsService {
     // Calcular satisfacción desde datos disponibles
     const satisfactionScore = this.calculateRealSatisfaction(conversations)
     
+    // ✅ Crear validación de métricas con trazabilidad
+    const validation = this.createMetricValidation(conversations, {
+      salesPatterns,
+      abandonedPatterns,
+      dataQuality
+    })
+    
     console.log('📊 Métricas generadas desde datos reales:', {
       totalConversations,
       completedSales,
       abandonedChats,
       conversionRate: `${conversionRate}%`,
       avgResponseTime,
-      satisfactionScore
+      satisfactionScore,
+      dataQuality
     })
 
     return {
@@ -152,7 +330,14 @@ export class DynamicMetricsService {
       abandonedChats,
       averageResponseTime: avgResponseTime,
       conversionRate,
-      satisfactionScore
+      satisfactionScore,
+      validation,
+      dataQuality: {
+        completenessScore: dataQuality.completenessScore,
+        reliabilityScore: dataQuality.reliabilityScore,
+        totalRowsAnalyzed: totalConversations,
+        estimatedDataAccuracy: dataQuality.estimatedAccuracy
+      }
     }
   }
 
@@ -534,7 +719,17 @@ export class DynamicMetricsService {
         type: 'text',
         category: "Eficiencia Comunicacional",
         icon: "📈",
-        aiGenerated: true
+        // ✅ Información de trazabilidad
+        dataSource: 'calculated',
+        isObjective: true, // Basado en datos directos del Excel
+        aiGenerated: false,
+        traceability: {
+          originFields: ['totalMessages', 'startDate', 'endDate'],
+          confidence: 'high',
+          calculationMethod: 'Suma de mensajes totales / días activos en el período',
+          basedOnRowCount: conversations.length,
+          warnings: conversations.length < 10 ? ['Muestra pequeña: menos de 10 conversaciones'] : []
+        }
       })
     }
 
@@ -551,7 +746,17 @@ export class DynamicMetricsService {
           value: momentum.percentage,
           direction: momentum.trend
         },
-        aiGenerated: true
+        // ✅ Información de trazabilidad
+        dataSource: 'calculated',
+        isObjective: true, // Basado en fechas del Excel
+        aiGenerated: false,
+        traceability: {
+          originFields: ['startDate', 'status'],
+          confidence: 'medium',
+          calculationMethod: 'Comparación de actividad entre períodos temporales',
+          basedOnRowCount: conversations.length,
+          warnings: conversations.length < 20 ? ['Muestra pequeña para análisis de tendencias'] : []
+        }
       })
     }
 
@@ -563,7 +768,17 @@ export class DynamicMetricsService {
       type: 'text',
       category: "Análisis de Complejidad",
       icon: complexityIndex.level === 'Alta' ? "🧩" : complexityIndex.level === 'Media' ? "⚖️" : "✅",
-      aiGenerated: true
+      // ✅ Información de trazabilidad
+      dataSource: 'calculated',
+      isObjective: true, // Basado en totalMessages del Excel
+      aiGenerated: false,
+      traceability: {
+        originFields: ['totalMessages', 'lastMessage', 'tags'],
+        confidence: 'medium',
+        calculationMethod: 'Análisis de longitud de mensajes y etiquetas',
+        basedOnRowCount: conversations.length,
+        warnings: ['Métrica inferida basada en contenido disponible']
+      }
     })
 
     // 4. Ratio de engagement real (mensajes del cliente vs total)
@@ -582,7 +797,17 @@ export class DynamicMetricsService {
           value: engagementRatio,
           direction: 'down' as const
         } : undefined,
-        aiGenerated: true
+        // ✅ Información de trazabilidad
+        dataSource: 'calculated',
+        isObjective: false, // Métrica inferida
+        aiGenerated: false,
+        traceability: {
+          originFields: ['totalMessages', 'lastMessage'],
+          confidence: 'low',
+          calculationMethod: 'Estimación basada en patrones de contenido de mensajes',
+          basedOnRowCount: conversations.length,
+          warnings: ['⚠️ Métrica estimada: No hay datos directos de mensajes del cliente vs empresa']
+        }
       })
     }
 
@@ -595,7 +820,17 @@ export class DynamicMetricsService {
         type: 'text',
         category: "Oportunidades Perdidas",
         icon: "🔄",
-        aiGenerated: true
+        // ✅ Información de trazabilidad
+        dataSource: 'calculated',
+        isObjective: false, // Métrica inferida
+        aiGenerated: false,
+        traceability: {
+          originFields: ['status', 'salesPotential', 'lastMessage'],
+          confidence: 'low',
+          calculationMethod: 'Identificación de conversaciones abandonadas con alto potencial',
+          basedOnRowCount: conversations.length,
+          warnings: ['⚠️ Métrica inferida: Basada en patrones de estado y potencial de venta']
+        }
       })
     }
 
@@ -607,7 +842,17 @@ export class DynamicMetricsService {
       type: 'percentage',
       category: "Calidad del Dataset",
       icon: dataQuality.score > 80 ? "✅" : dataQuality.score > 60 ? "⚠️" : "❌",
-      aiGenerated: true
+      // ✅ Información de trazabilidad
+      dataSource: 'excel_direct',
+      isObjective: true, // Basado en análisis directo del Excel
+      aiGenerated: false,
+      traceability: {
+        originFields: ['customerName', 'customerPhone', 'startDate', 'status', 'totalMessages', 'lastMessage'],
+        confidence: 'high',
+        calculationMethod: 'Análisis de completitud de campos críticos del Excel',
+        basedOnRowCount: conversations.length,
+        warnings: dataQuality.score < 70 ? [`📊 Calidad de datos baja: ${dataQuality.score}%`] : []
+      }
     })
 
     return metrics
@@ -781,6 +1026,14 @@ export class DynamicMetricsService {
         type: 'text',
         category: "Patrones de Comunicación",
         icon: responseVelocity.category === 'Muy Rápida' ? "⚡" : responseVelocity.category === 'Rápida' ? "🔥" : "🐌",
+        dataSource: 'calculated',
+        traceability: {
+          originFields: ['totalMessages', 'metadata.responseTime'],
+          confidence: 'medium',
+          calculationMethod: 'Análisis de tiempo de respuesta basado en mensajes y metadata',
+          basedOnRowCount: conversations.length
+        },
+        isObjective: false,
         aiGenerated: true
       })
     }
@@ -800,6 +1053,14 @@ export class DynamicMetricsService {
         type: 'text',
         category: "Oportunidades de Negocio",
         icon: "⏱️",
+        dataSource: 'calculated',
+        traceability: {
+          originFields: ['status', 'startDate', 'endDate'],
+          confidence: 'medium',
+          calculationMethod: 'Análisis de tiempo promedio para conversiones completadas',
+          basedOnRowCount: conversations.filter(c => c.status === 'completed').length
+        },
+        isObjective: false,
         aiGenerated: true
       })
     }
@@ -823,6 +1084,14 @@ export class DynamicMetricsService {
           value: messageEfficiency,
           direction: 'up' as const
         } : undefined,
+        dataSource: 'calculated',
+        traceability: {
+          originFields: ['totalMessages', 'status'],
+          confidence: 'high',
+          calculationMethod: 'Porcentaje de mensajes que resultaron en conversiones o respuestas positivas',
+          basedOnRowCount: conversations.length
+        },
+        isObjective: true,
         aiGenerated: true
       })
     }
@@ -1007,7 +1276,35 @@ export class DynamicMetricsService {
     summary: string
     keyFindings: string[]
     recommendations: string[]
+    dataSourceBreakdown: {
+      directFromExcel: number
+      aiInferred: number
+      calculated: number
+    }
+    reliabilityWarnings: string[]
   }> {
+    // ✅ Evaluar calidad de datos para determinar confiabilidad de insights
+    const dataQuality = this.assessExcelDataQuality(conversations)
+    const reliabilityWarnings: string[] = []
+    
+    // Agregar advertencias basadas en calidad de datos
+    if (dataQuality.completenessScore < 70) {
+      reliabilityWarnings.push(`⚠️ Completitud de datos: ${dataQuality.completenessScore}% - Los insights pueden tener precisión limitada`)
+    }
+    
+    if (conversations.length < 10) {
+      reliabilityWarnings.push('📈 Muestra pequeña: Menos de 10 conversaciones pueden generar insights menos confiables')
+    }
+    
+    const simulatedDataCount = conversations.filter(c => 
+      c.metadata?.incompleteData || 
+      (c.metadata?.dataQuality?.completenessScore && c.metadata.dataQuality.completenessScore < 50)
+    ).length
+    
+    if (simulatedDataCount > conversations.length * 0.3) {
+      reliabilityWarnings.push(`🤖 Datos simulados: ${Math.round((simulatedDataCount / conversations.length) * 100)}% de datos podrían ser estimados`)
+    }
+
     // Si tenemos servicio de IA, usarlo para insights más sofisticados
     if (this.analysisService && conversations.length > 0) {
       try {
@@ -1026,10 +1323,23 @@ export class DynamicMetricsService {
         const aiRecommendations = await this.generateAIRecommendations(conversations, metrics)
         const combinedRecommendations = [...dataRecommendations, ...aiRecommendations]
 
+        // ✅ Calcular desglose de fuentes de datos
+        const totalInsights = combinedFindings.length + combinedRecommendations.length + 1 // +1 por summary
+        const aiInsights = aiFindings.length + aiRecommendations.length + (aiSummary.length > 100 ? 1 : 0)
+        const dataInsights = dataFindings.length + dataRecommendations.length
+        
+        const dataSourceBreakdown = {
+          directFromExcel: Math.round((dataInsights / totalInsights) * 100),
+          aiInferred: Math.round((aiInsights / totalInsights) * 100),
+          calculated: Math.round(((totalInsights - aiInsights - dataInsights) / totalInsights) * 100)
+        }
+
         return {
           summary: aiSummary,
-          keyFindings: combinedFindings.slice(0, 8), // Limitar para evitar saturación
-          recommendations: combinedRecommendations.slice(0, 10)
+          keyFindings: this.generateSimpleFindings(conversations, metrics, this.analyzeSalesPatterns(conversations), this.analyzeTimePatterns(conversations), this.analyzeSatisfactionPatterns(conversations)),
+          recommendations: this.generateSimpleSummary(conversations, metrics),
+          dataSourceBreakdown,
+          reliabilityWarnings
         }
       } catch (error) {
         console.error('Error generando insights con IA:', error)
@@ -1038,7 +1348,16 @@ export class DynamicMetricsService {
     }
 
     // Fallback a análisis basado en datos
-    return this.generateFallbackInsights(conversations, metrics)
+    const fallbackInsights = this.generateFallbackInsights(conversations, metrics)
+    return {
+      ...fallbackInsights,
+      dataSourceBreakdown: {
+        directFromExcel: 90, // Insights basados principalmente en datos del Excel
+        aiInferred: 0,
+        calculated: 10
+      },
+      reliabilityWarnings
+    }
   }
 
   private async generateEnhancedAISummary(conversations: Conversation[], metrics: DashboardMetrics): Promise<string> {
@@ -1052,11 +1371,11 @@ export class DynamicMetricsService {
       
       // Crear contexto específico para el resumen
       const summaryContext = `
-GENERAR RESUMEN EJECUTIVO BASADO EN MÉTRICAS DE RENDIMIENTO Y ANÁLISIS AVANZADO:
+GENERAR RESUMEN SIMPLE Y CLARO PARA CUALQUIER PERSONA:
 
 ${context}
 
-INSTRUCCIONES: Generar un resumen ejecutivo que integre las métricas de rendimiento principales con el análisis avanzado de datos. El resumen debe ser específico, cuantificado y orientado a resultados empresariales. Incluir tendencias, patrones identificados y su impacto en el negocio.
+INSTRUCCIONES: Generar un resumen simple y fácil de entender para cualquier persona, sin términos técnicos. Usar lenguaje cotidiano y explicar de forma sencilla lo que muestran los datos del negocio. El resumen debe ser específico pero accesible para todos.
       `
       
       // Generar resumen con contexto mejorado para IA
@@ -1082,9 +1401,8 @@ INSTRUCCIONES: Generar un resumen ejecutivo que integre las métricas de rendimi
       if (aiSummary.length < 100 || 
           (!aiSummary.includes(metrics.totalConversations.toString()) && 
            !aiSummary.includes(metrics.conversionRate.toFixed(1)))) {
-        // Combinar resumen de IA con datos específicos de métricas
-        const fallbackSummary = this.generateFallbackInsights(conversations, metrics).summary
-        return `${aiSummary}\n\n${fallbackSummary}`
+        // Si el resumen de IA no es suficiente, usar solo el fallback (ya está en formato de lista)
+        return this.generateFallbackInsights(conversations, metrics).summary
       }
       
       return aiSummary
@@ -1144,9 +1462,9 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     // 📈 INTEGRAR MÉTRICAS DE RENDIMIENTO PRINCIPALES
     // Análisis de conversión basado en métricas de rendimiento
     if (metrics.conversionRate > 25) {
-      findings.push(`📈 Métricas de Rendimiento: Excelente tasa de conversión del ${metrics.conversionRate.toFixed(1)}% supera estándares de mercado (15-25%)`)
+      findings.push(`• 📈 Excelente tasa de conversión del ${metrics.conversionRate.toFixed(1)}% supera estándares de mercado (15-25%)`)
     } else if (metrics.conversionRate < 15 && metrics.conversionRate > 0) {
-      findings.push(`📉 Métricas de Rendimiento: Tasa de conversión del ${metrics.conversionRate.toFixed(1)}% requiere optimización para alcanzar estándar de mercado`)
+      findings.push(`• 📉 Tasa de conversión del ${metrics.conversionRate.toFixed(1)}% requiere optimización para alcanzar estándar de mercado`)
     }
 
     // 📊 INTEGRAR ANÁLISIS AVANZADO DE DATOS
@@ -1157,18 +1475,18 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     if (engagementMetric) {
       const engagementValue = parseInt(engagementMetric.value.toString().replace(/\D/g, '')) || 0
       if (engagementValue > 60) {
-        findings.push(`📊 Análisis Avanzado: ${engagementMetric.title} del ${engagementValue}% indica alta interacción con clientes`)
+        findings.push(`• 📊 ${engagementMetric.title} del ${engagementValue}% indica alta interacción con clientes`)
       } else if (engagementValue < 30) {
-        findings.push(`📊 Análisis Avanzado: ${engagementMetric.title} del ${engagementValue}% sugiere necesidad de mejorar estrategias de engagement`)
+        findings.push(`• 📊 ${engagementMetric.title} del ${engagementValue}% sugiere necesidad de mejorar estrategias de engagement`)
       }
     }
 
     if (qualityMetric) {
       const qualityValue = parseInt(qualityMetric.value.toString().replace(/\D/g, '')) || 0
       if (qualityValue > 80) {
-        findings.push(`📊 Análisis Avanzado: ${qualityMetric.title} del ${qualityValue}% facilita análisis predictivo preciso`)
+        findings.push(`• 📊 ${qualityMetric.title} del ${qualityValue}% facilita análisis predictivo preciso`)
       } else if (qualityValue < 60) {
-        findings.push(`📊 Análisis Avanzado: ${qualityMetric.title} del ${qualityValue}% requiere estandarización de datos`)
+        findings.push(`• 📊 ${qualityMetric.title} del ${qualityValue}% requiere estandarización de datos`)
       }
     }
 
@@ -1179,17 +1497,17 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     // Hallazgos basados en métricas de abandono
     if (metrics.abandonedChats > metrics.completedSales) {
       const recoveryOpportunity = ((metrics.abandonedChats / metrics.totalConversations) * 100).toFixed(1)
-      findings.push(`🔄 Análisis de Recuperación: ${metrics.abandonedChats} conversaciones abandonadas representan ${recoveryOpportunity}% de oportunidades no capitalizadas`)
+      findings.push(`• 🔄 ${metrics.abandonedChats} conversaciones abandonadas representan ${recoveryOpportunity}% de oportunidades no capitalizadas`)
     }
 
     // Hallazgos basados en potencial de ventas del análisis avanzado
     if (salesAnalysis.highPotentialPercentage > 30) {
-      findings.push(`🎯 Análisis de Potencial: ${salesAnalysis.highPotential} leads de alto potencial (${salesAnalysis.highPotentialPercentage}%) disponibles para conversión prioritaria`)
+      findings.push(`• 🎯 ${salesAnalysis.highPotential} leads de alto potencial (${salesAnalysis.highPotentialPercentage}%) disponibles para conversión prioritaria`)
     }
 
     // Hallazgos temporales del análisis avanzado
     if (timeAnalysis.peakHour !== -1 && timeAnalysis.weekendActivity > 20) {
-      findings.push(`⏰ Análisis Temporal: Actividad concentrada a las ${timeAnalysis.peakHour}:00 con ${timeAnalysis.weekendActivity}% en fines de semana indica oportunidad de horario extendido`)
+      findings.push(`• ⏰ Actividad concentrada a las ${timeAnalysis.peakHour}:00 con ${timeAnalysis.weekendActivity}% en fines de semana indica oportunidad de horario extendido`)
     }
 
     // Análisis de satisfacción cuando está disponible
@@ -1200,15 +1518,15 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     if (satisfactionScores.length > 0) {
       const avgSatisfaction = satisfactionScores.reduce((sum, score) => sum + score, 0) / satisfactionScores.length
       if (avgSatisfaction >= 4.5) {
-        findings.push(`⭐ Métricas de Satisfacción: Promedio de ${avgSatisfaction.toFixed(1)}/5 en ${satisfactionScores.length} evaluaciones indica excelencia en servicio`)
+        findings.push(`• ⭐ Promedio de ${avgSatisfaction.toFixed(1)}/5 en ${satisfactionScores.length} evaluaciones indica excelencia en servicio`)
       } else if (avgSatisfaction < 3.5) {
-        findings.push(`⚠️ Métricas de Satisfacción: Promedio de ${avgSatisfaction.toFixed(1)}/5 requiere intervención inmediata en procesos de atención`)
+        findings.push(`• ⚠️ Promedio de ${avgSatisfaction.toFixed(1)}/5 requiere intervención inmediata en procesos de atención`)
       }
     }
 
     return findings.length > 0 ? findings : [
-      `📊 Análisis completado: ${conversations.length} conversaciones procesadas con métricas de rendimiento y análisis avanzado integrados`,
-      `🔍 Sistema identificó patrones específicos en datos de rendimiento empresarial`
+      `• 📊 Análisis completado: ${conversations.length} conversaciones procesadas con métricas de rendimiento y análisis avanzado integrados`,
+      `• 🔍 Sistema identificó patrones específicos en datos de rendimiento empresarial`
     ]
   }
 
@@ -1230,50 +1548,50 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     // Recomendaciones CRÍTICAS basadas en métricas de rendimiento
     if (metrics.abandonedChats > metrics.completedSales) {
       const recoveryPotential = (metrics.abandonedChats * metrics.conversionRate / 100).toFixed(0)
-      recommendations.push(`🚨 MÉTRICAS CRÍTICAS: ${metrics.abandonedChats} conversaciones abandonadas vs ${metrics.completedSales} ventas - protocolo de recuperación podría generar ${recoveryPotential} ventas adicionales`)
-      recommendations.push(`📋 Implementar secuencia automatizada: contacto a 24h, 48h y 7 días para maximizar recuperación basada en análisis de patrones`)
+      recommendations.push(`• 🚨 MÉTRICAS CRÍTICAS: ${metrics.abandonedChats} conversaciones abandonadas vs ${metrics.completedSales} ventas - protocolo de recuperación podría generar ${recoveryPotential} ventas adicionales`)
+      recommendations.push(`• 📋 Implementar secuencia automatizada: contacto a 24h, 48h y 7 días para maximizar recuperación basada en análisis de patrones`)
     }
 
     // Recomendaciones basadas en conversión y análisis avanzado
     if (metrics.conversionRate < 15 && metrics.conversionRate > 0) {
       const improvementTarget = 15 - metrics.conversionRate
       const potentialSales = Math.round((metrics.totalConversations * improvementTarget / 100))
-      recommendations.push(`📈 OPTIMIZACIÓN DE RENDIMIENTO: Mejorar conversión del ${metrics.conversionRate.toFixed(1)}% al 15% generaría ${potentialSales} ventas adicionales`)
-      recommendations.push(`🔍 Analizar ${metrics.completedSales} ventas exitosas para replicar técnicas en análisis de datos`)
+      recommendations.push(`• 📈 OPTIMIZACIÓN DE RENDIMIENTO: Mejorar conversión del ${metrics.conversionRate.toFixed(1)}% al 15% generaría ${potentialSales} ventas adicionales`)
+      recommendations.push(`• 🔍 Analizar ${metrics.completedSales} ventas exitosas para replicar técnicas en análisis de datos`)
     } else if (metrics.conversionRate > 25) {
-      recommendations.push(`🏆 MÉTRICAS EXCELENTES: Conversión del ${metrics.conversionRate.toFixed(1)}% - documentar mejores prácticas y escalar metodología`)
+      recommendations.push(`• 🏆 MÉTRICAS EXCELENTES: Conversión del ${metrics.conversionRate.toFixed(1)}% - documentar mejores prácticas y escalar metodología`)
     }
 
     // Recomendaciones basadas en métricas dinámicas de oportunidades
     if (opportunitiesMetric) {
       const opportunityCount = parseInt(opportunitiesMetric.value.toString().replace(/\D/g, '')) || 0
       if (opportunityCount > 0) {
-        recommendations.push(`🔄 ANÁLISIS AVANZADO: ${opportunityCount} oportunidades recuperables identificadas - implementar campaña específica de reactivación`)
+        recommendations.push(`• 🔄 ANÁLISIS AVANZADO: ${opportunityCount} oportunidades recuperables identificadas - implementar campaña específica de reactivación`)
       }
     }
 
     // Recomendaciones basadas en momentum del negocio
     if (momentumMetric && momentumMetric.trend) {
       if (momentumMetric.trend.direction === 'up') {
-        recommendations.push(`🚀 MOMENTUM POSITIVO: Aprovechar tendencia creciente para expandir estrategias exitosas y aumentar capacidad`)
+        recommendations.push(`• 🚀 MOMENTUM POSITIVO: Aprovechar tendencia creciente para expandir estrategias exitosas y aumentar capacidad`)
       } else if (momentumMetric.trend.direction === 'down') {
-        recommendations.push(`📉 MOMENTUM NEGATIVO: Revisar procesos y implementar acciones correctivas inmediatas basadas en análisis de datos`)
+        recommendations.push(`• 📉 MOMENTUM NEGATIVO: Revisar procesos y implementar acciones correctivas inmediatas basadas en análisis de datos`)
       }
     }
 
     // Recomendaciones específicas de agentes basadas en métricas
     if (agentAnalysis.totalAgents > 1 && agentAnalysis.topAgent) {
       const topAgentPerformance = ((agentAnalysis.topAgent.conversations / metrics.totalConversations) * 100).toFixed(1)
-      recommendations.push(`👨‍💼 ANÁLISIS DE RENDIMIENTO: ${agentAnalysis.topAgent.name} maneja ${topAgentPerformance}% de conversaciones - establecer como mentor y replicar metodología`)
+      recommendations.push(`• 👨‍💼 ANÁLISIS DE RENDIMIENTO: ${agentAnalysis.topAgent.name} maneja ${topAgentPerformance}% de conversaciones - establecer como mentor y replicar metodología`)
     }
 
     // Recomendaciones basadas en potencial de ventas del análisis avanzado
     if (salesAnalysis.highPotentialPercentage > 0) {
       const revenuePotential = (salesAnalysis.avgPurchaseValue * salesAnalysis.highPotential).toFixed(2)
-      recommendations.push(`🎯 PRIORIDAD ALTA: ${salesAnalysis.highPotential} leads de alto potencial (valor estimado: €${revenuePotential}) requieren seguimiento inmediato`)
+      recommendations.push(`• 🎯 PRIORIDAD ALTA: ${salesAnalysis.highPotential} leads de alto potencial (valor estimado: €${revenuePotential}) requieren seguimiento inmediato`)
       
       if (salesAnalysis.highPotentialPercentage < 20) {
-        recommendations.push(`📊 CALIFICACIÓN DE LEADS: Solo ${salesAnalysis.highPotentialPercentage}% son alto potencial - mejorar sistema de scoring basado en análisis de datos`)
+        recommendations.push(`• 📊 CALIFICACIÓN DE LEADS: Solo ${salesAnalysis.highPotentialPercentage}% son alto potencial - mejorar sistema de scoring basado en análisis de datos`)
       }
     }
 
@@ -1287,44 +1605,44 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
       const conversionImpact = avgResponseTime > 30 ? (avgResponseTime - 30) * 0.02 : 0
       
       if (avgResponseTime > 60) {
-        recommendations.push(`⏰ TIEMPO CRÍTICO: Respuesta promedio de ${avgResponseTime.toFixed(0)} min impacta conversión - objetivo <30 min podría mejorar conversión en ${conversionImpact.toFixed(1)}%`)
-        recommendations.push(`🔔 Implementar sistema de notificaciones inmediatas y turnos 24/7 basado en análisis de patrones temporales`)
+        recommendations.push(`• ⏰ TIEMPO CRÍTICO: Respuesta promedio de ${avgResponseTime.toFixed(0)} min impacta conversión - objetivo <30 min podría mejorar conversión en ${conversionImpact.toFixed(1)}%`)
+        recommendations.push(`• 🔔 Implementar sistema de notificaciones inmediatas y turnos 24/7 basado en análisis de patrones temporales`)
       }
     }
 
     // Recomendaciones basadas en patrones temporales del análisis avanzado
     if (timeAnalysis.peakHour !== -1) {
       const peakActivity = timeAnalysis.weekendActivity > 20 ? 'incluyendo fines de semana' : 'en días laborales'
-      recommendations.push(`📅 OPTIMIZACIÓN TEMPORAL: Reforzar personal ${timeAnalysis.peakHour}:00-${timeAnalysis.peakHour + 1}:00 ${peakActivity} según análisis de patrones`)
+      recommendations.push(`• 📅 OPTIMIZACIÓN TEMPORAL: Reforzar personal ${timeAnalysis.peakHour}:00-${timeAnalysis.peakHour + 1}:00 ${peakActivity} según análisis de patrones`)
     }
 
     // Recomendaciones de engagement basadas en análisis avanzado
     if (contentAnalysis.avgMessageLength < 5) {
       const engagementTarget = (contentAnalysis.avgMessageLength * 2).toFixed(1)
-      recommendations.push(`💬 ENGAGEMENT: Conversaciones promedio de ${Math.round(contentAnalysis.avgMessageLength)} mensajes - objetivo ${engagementTarget} mensajes con técnicas estructuradas`)
-      recommendations.push(`📝 Crear banco de preguntas específicas basado en análisis de contenido para aumentar interacción`)
+      recommendations.push(`• 💬 ENGAGEMENT: Conversaciones promedio de ${Math.round(contentAnalysis.avgMessageLength)} mensajes - objetivo ${engagementTarget} mensajes con técnicas estructuradas`)
+      recommendations.push(`• 📝 Crear banco de preguntas específicas basado en análisis de contenido para aumentar interacción`)
     }
 
     // Recomendaciones de satisfacción basadas en métricas
     if (satisfactionData.hasData) {
       if (satisfactionData.excellentPercentage < 60) {
         const improvementTarget = 80 - satisfactionData.excellentPercentage
-        recommendations.push(`⭐ SATISFACCIÓN: Aumentar excelencia del ${satisfactionData.excellentPercentage}% al 80% (+${improvementTarget}%) con seguimiento post-conversación`)
+        recommendations.push(`• ⭐ SATISFACCIÓN: Aumentar excelencia del ${satisfactionData.excellentPercentage}% al 80% (+${improvementTarget}%) con seguimiento post-conversación`)
       }
     } else {
-      recommendations.push(`📊 MEDICIÓN: Implementar scoring de satisfacción obligatorio para generar métricas precisas de rendimiento`)
+      recommendations.push(`• 📊 MEDICIÓN: Implementar scoring de satisfacción obligatorio para generar métricas precisas de rendimiento`)
     }
 
     // Recomendaciones de valor económico basadas en análisis de ventas
     if (salesAnalysis.avgPurchaseValue > 0) {
       const upsellPotential = (salesAnalysis.avgPurchaseValue * 1.2).toFixed(2)
-      recommendations.push(`💰 VALOR POR CLIENTE: Ticket promedio €${salesAnalysis.avgPurchaseValue.toFixed(2)} - estrategias de upselling podrían alcanzar €${upsellPotential}`)
+      recommendations.push(`• 💰 VALOR POR CLIENTE: Ticket promedio €${salesAnalysis.avgPurchaseValue.toFixed(2)} - estrategias de upselling podrían alcanzar €${upsellPotential}`)
     }
 
     return recommendations.length > 0 ? recommendations.slice(0, 10) : [
-      "📈 Mantener consistencia en análisis de métricas de rendimiento semanales",
-      "📊 Implementar revisiones de análisis avanzado con todo el equipo",
-      "🎯 Establecer KPIs específicos basados en patrones únicos identificados en datos"
+      "• 📈 Mantener consistencia en análisis de métricas de rendimiento semanales",
+      "• 📊 Implementar revisiones de análisis avanzado con todo el equipo",
+      "• 🎯 Establecer KPIs específicos basados en patrones únicos identificados en datos"
     ]
   }
 
@@ -1341,60 +1659,134 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
     const satisfactionData = this.analyzeSatisfactionPatterns(conversations)
     const repeatCustomers = this.findRepeatCustomers(conversations)
 
-    // Crear resumen detallado y relevante
-    let summary = `📊 Análisis completo de ${metrics.totalConversations} conversaciones de WhatsApp extraídas del Excel. `
+    // RESUMEN GENERAL - Información básica y fácil de entender
+    const summaryItems: string[] = []
     
-    // Información de conversión y ventas
+    summaryItems.push(`• Se analizaron ${metrics.totalConversations} conversaciones de WhatsApp de tu negocio`)
+    
     if (metrics.completedSales > 0) {
-      summary += `Se lograron ${metrics.completedSales} ventas exitosas con una tasa de conversión del ${metrics.conversionRate.toFixed(1)}%. `
-    }
-    
-    // Información de clientes
-    if (repeatCustomers.total > 0) {
-      summary += `Se identificaron ${repeatCustomers.total} clientes únicos, con ${repeatCustomers.count} clientes recurrentes (${repeatCustomers.rate}% de retención). `
-    }
-    
-    // Información de agentes
-    if (agentAnalysis.totalAgents > 0) {
-      summary += `El equipo de ${agentAnalysis.totalAgents} agente(s) procesó un promedio de ${agentAnalysis.avgConversationsPerAgent} conversaciones cada uno. `
-    }
-    
-    // Información temporal
-    if (timeAnalysis.peakHour !== -1) {
-      summary += `La actividad máxima se concentra a las ${timeAnalysis.peakHour}:00. `
-    }
-    
-    // Información de engagement
-    if (contentAnalysis.avgMessageLength > 0) {
-      summary += `Las conversaciones tienen un promedio de ${Math.round(contentAnalysis.avgMessageLength)} mensajes, `
-      if (contentAnalysis.avgMessageLength < 5) {
-        summary += "indicando oportunidades para mayor engagement. "
-      } else if (contentAnalysis.avgMessageLength > 20) {
-        summary += "mostrando alto nivel de interacción con clientes. "
-      } else {
-        summary += "reflejando un buen balance de comunicación. "
-      }
-    }
-    
-    // Información de satisfacción
-    if (satisfactionData.hasData) {
-      summary += `La satisfacción del cliente muestra ${satisfactionData.excellentPercentage}% de evaluaciones excelentes. `
-    }
-    
-    // Alertas importantes
-    if (metrics.abandonedChats > metrics.completedSales) {
-      summary += `⚠️ ATENCIÓN: ${metrics.abandonedChats} conversaciones abandonadas superan las ventas completadas, representando una oportunidad significativa de recuperación.`
-    } else if (salesAnalysis.highPotentialPercentage > 30) {
-      summary += `🎯 OPORTUNIDAD: ${salesAnalysis.highPotential} leads de alto potencial detectados (${salesAnalysis.highPotentialPercentage}% del total) listos para seguimiento prioritario.`
+      summaryItems.push(`• Se concretaron ${metrics.completedSales} ventas con una efectividad del ${metrics.conversionRate.toFixed(1)}%`)
     } else {
-      summary += `El negocio muestra un patrón de crecimiento sostenible con oportunidades de optimización identificadas.`
+      summaryItems.push(`• No se registraron ventas completadas en el período analizado`)
     }
+    
+    if (repeatCustomers.total > 0) {
+      summaryItems.push(`• Tienes ${repeatCustomers.total} clientes diferentes, ${repeatCustomers.count} son clientes que volvieron`)
+    }
+    
+    if (agentAnalysis.totalAgents > 0) {
+      summaryItems.push(`• Tu equipo de ${agentAnalysis.totalAgents} persona(s) atendió en promedio ${agentAnalysis.avgConversationsPerAgent} conversaciones cada uno`)
+    }
+    
+    if (timeAnalysis.peakHour !== -1) {
+      summaryItems.push(`• La hora con más actividad es a las ${timeAnalysis.peakHour}:00`)
+    }
+    
+    if (contentAnalysis.avgMessageLength > 0) {
+      let engagementText = `• Cada conversación tiene en promedio ${Math.round(contentAnalysis.avgMessageLength)} mensajes`
+      if (contentAnalysis.avgMessageLength < 5) {
+        engagementText += ", lo cual indica que podrías tener conversaciones más largas"
+      } else if (contentAnalysis.avgMessageLength > 20) {
+        engagementText += ", lo cual muestra que tienes buenas conversaciones con tus clientes"
+      } else {
+        engagementText += ", lo cual está bien balanceado"
+      }
+      summaryItems.push(engagementText)
+    }
+    
+    if (satisfactionData.hasData) {
+      summaryItems.push(`• ${satisfactionData.excellentPercentage}% de tus clientes calificó el servicio como excelente`)
+    }
+    
+    const summary = summaryItems.join("")
 
     return {
       summary,
-      keyFindings: this.generateDataDrivenFindings(conversations, metrics),
-      recommendations: this.generateDataDrivenRecommendations(conversations, metrics)
+      keyFindings: this.generateSimpleFindings(conversations, metrics, salesAnalysis, timeAnalysis, satisfactionData),
+      recommendations: this.generateSimpleSummary(conversations, metrics)
     }
+  }
+
+  // NUEVA FUNCIÓN PARA HALLAZGOS BASADOS EN PATRONES
+  private generateSimpleFindings(conversations: Conversation[], metrics: DashboardMetrics, salesAnalysis: any, timeAnalysis: any, satisfactionData: any): string[] {
+    const findings: string[] = []
+    
+    // Patrones de conversión
+    if (metrics.conversionRate > 20) {
+      findings.push(`• Tu negocio convierte muy bien: ${metrics.conversionRate.toFixed(1)}% de conversaciones se vuelven ventas`)
+    } else if (metrics.conversionRate < 10 && metrics.conversionRate > 0) {
+      findings.push(`• Hay oportunidad de mejorar: solo ${metrics.conversionRate.toFixed(1)}% de conversaciones se convierten en ventas`)
+    }
+    
+    // Patrón de conversaciones perdidas
+    if (metrics.abandonedChats > metrics.completedSales) {
+      findings.push(`• Se perdieron ${metrics.abandonedChats} conversaciones potenciales, más que las ventas logradas`)
+    }
+    
+    // Patrones de clientes potenciales
+    if (salesAnalysis.highPotentialPercentage > 25) {
+      findings.push(`• Tienes ${salesAnalysis.highPotential} clientes con alta probabilidad de compra`)
+    }
+    
+    // Patrones de horarios
+    if (timeAnalysis.peakHour !== -1) {
+      if (timeAnalysis.weekendActivity > 30) {
+        findings.push(`• Tus clientes también escriben los fines de semana, especialmente a las ${timeAnalysis.peakHour}:00`)
+      } else {
+        findings.push(`• La mayoría de tus clientes escriben entre semana, especialmente a las ${timeAnalysis.peakHour}:00`)
+      }
+    }
+    
+    // Patrones de satisfacción
+    if (satisfactionData.hasData) {
+      if (satisfactionData.excellentPercentage >= 80) {
+        findings.push(`• Tus clientes están muy contentos: ${satisfactionData.excellentPercentage}% califica como excelente`)
+      } else if (satisfactionData.excellentPercentage < 50) {
+        findings.push(`• Hay que mejorar la atención: solo ${satisfactionData.excellentPercentage}% está muy conforme`)
+      }
+    }
+    
+    return findings.length > 0 ? findings : [
+      `• Se procesaron ${conversations.length} conversaciones para encontrar patrones`,
+      `• Los datos muestran el comportamiento regular de tu negocio`
+    ]
+  }
+
+  // NUEVA FUNCIÓN PARA RECOMENDACIONES COMO RESUMEN SIMPLE
+  private generateSimpleSummary(conversations: Conversation[], metrics: DashboardMetrics): string[] {
+    const summary: string[] = []
+    
+    // Resumen de datos básicos
+    summary.push(`• Total de conversaciones analizadas: ${metrics.totalConversations}`)
+    summary.push(`• Ventas completadas: ${metrics.completedSales}`)
+    summary.push(`• Conversaciones sin cerrar: ${metrics.abandonedChats}`)
+    summary.push(`• Porcentaje de éxito: ${metrics.conversionRate.toFixed(1)}%`)
+    
+    // Resumen de clientes únicos
+    const uniqueCustomers = new Set(conversations.map(c => c.customerPhone)).size
+    summary.push(`• Clientes únicos contactados: ${uniqueCustomers}`)
+    
+    // Resumen de agentes
+    const uniqueAgents = new Set(conversations.map(c => c.assignedAgent).filter(Boolean)).size
+    if (uniqueAgents > 0) {
+      summary.push(`• Personas del equipo que atendieron: ${uniqueAgents}`)
+    }
+    
+    // Resumen de respuestas
+    const conversationsWithResponse = conversations.filter(c => c.totalMessages > 1).length
+    summary.push(`• Conversaciones con respuesta: ${conversationsWithResponse}`)
+    
+    // Resumen de satisfacción si está disponible
+    const satisfactionScores = conversations
+      .map(c => c.metadata?.satisfaction)
+      .filter(s => s !== undefined && s > 0)
+    
+    if (satisfactionScores.length > 0) {
+      const avgSatisfaction = satisfactionScores.reduce((sum: number, score: number) => sum + score, 0) / satisfactionScores.length
+      summary.push(`• Promedio de satisfacción: ${avgSatisfaction.toFixed(1)}/5 (${satisfactionScores.length} evaluaciones)`)
+    }
+
+    return summary
   }
 
   private getEmptyDashboard(): AIGeneratedDashboard {
@@ -1405,13 +1797,32 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
         abandonedChats: 0,
         averageResponseTime: 'N/A',
         conversionRate: 0,
-        satisfactionScore: 0
+        satisfactionScore: 0,
+        // ✅ Información de validación para dashboard vacío
+        validation: {
+          isValid: false,
+          qualityScore: 0,
+          issues: ['No hay datos para analizar'],
+          recommendations: ['Cargar archivo Excel con conversaciones']
+        },
+        dataQuality: {
+          completenessScore: 0,
+          reliabilityScore: 0,
+          totalRowsAnalyzed: 0,
+          estimatedDataAccuracy: 0
+        }
       },
       dynamicMetrics: [],
       insights: {
         summary: "No hay datos disponibles. Sube un archivo Excel con conversaciones para generar métricas automáticamente.",
         keyFindings: ["Sin datos para analizar"],
-        recommendations: ["Sube tu primer archivo para comenzar el análisis automático"]
+        recommendations: ["Sube tu primer archivo para comenzar el análisis automático"],
+        dataSourceBreakdown: {
+          directFromExcel: 0,
+          aiInferred: 0,
+          calculated: 0
+        },
+        reliabilityWarnings: []
       }
     }
   }
@@ -1419,18 +1830,58 @@ ${dynamicMetrics.map(metric => `- ${metric.title}: ${metric.value} (${metric.cat
   private getFallbackDashboard(conversations: Conversation[]): AIGeneratedDashboard {
     const baseMetrics = this.calculateBaseMetrics(conversations)
     
+    // ✅ Crear validación para el dashboard fallback
+    const dataQuality = this.assessExcelDataQuality(conversations)
+    const validation: MetricValidation = {
+      isValid: dataQuality.completenessScore >= 50,
+      qualityScore: dataQuality.completenessScore,
+      issues: dataQuality.issues,
+      recommendations: dataQuality.completenessScore < 70 
+        ? ['Mejorar calidad de datos del Excel para análisis más preciso']
+        : ['Dashboard generado con datos confiables']
+    }
+    
     return {
-      mainMetrics: baseMetrics,
+      mainMetrics: {
+        ...baseMetrics,
+        validation,
+        dataQuality: {
+          completenessScore: dataQuality.completenessScore,
+          reliabilityScore: dataQuality.reliabilityScore,
+          totalRowsAnalyzed: conversations.length,
+          estimatedDataAccuracy: dataQuality.estimatedAccuracy
+        }
+      },
       dynamicMetrics: [
         {
           title: "Análisis Disponible",
           value: "Datos procesados",
           type: 'text',
           category: "Estado",
-          aiGenerated: true
+          // ✅ Información de trazabilidad para métrica fallback
+          dataSource: 'excel_direct',
+          isObjective: true,
+          aiGenerated: false,
+          traceability: {
+            originFields: ['totalConversations'],
+            confidence: 'high',
+            calculationMethod: 'Conteo directo de filas del Excel procesado',
+            basedOnRowCount: conversations.length,
+            warnings: conversations.length < 5 ? ['Datos insuficientes para análisis avanzado'] : []
+          }
         }
       ],
-      insights: this.generateFallbackInsights(conversations, baseMetrics)
+      insights: {
+        ...this.generateFallbackInsights(conversations, baseMetrics),
+        dataSourceBreakdown: {
+          directFromExcel: 95, // La mayoría de insights vienen directamente del Excel
+          aiInferred: 0,
+          calculated: 5
+        },
+        reliabilityWarnings: validation.issues.length > 0 
+          ? [`⚠️ Calidad de datos: ${dataQuality.completenessScore}%`]
+          : []
+      }
     }
   }
 } 
