@@ -102,7 +102,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
   const getStandardizedInterest = (conv: Conversation) => {
     if (!conv.interest) {
       return {
-        label: '🤖 Sin analizar',
+        label: 'Sin analizar',
         icon: '🤖',
         category: 'Sin datos',
         detectedIn: 'N/A',
@@ -114,7 +114,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
     
     if (interest.includes('factura') || interest.includes('invoice')) {
       return {
-        label: '🧾 Factura A',
+        label: 'Factura A',
         icon: '🧾',
         category: 'Documentación',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,
@@ -122,7 +122,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
       }
     } else if (interest.includes('compra') || interest.includes('comprar') || interest.includes('precio')) {
       return {
-        label: '🛒 Intención de compra',
+        label: 'Intención de compra',
         icon: '🛒',
         category: 'Comercial',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages * 0.6) + 1}`,
@@ -130,7 +130,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
       }
     } else if (interest.includes('pago') || interest.includes('transferencia') || interest.includes('money')) {
       return {
-        label: '💰 Pago',
+        label: 'Pago',
         icon: '💰',
         category: 'Transacción',
         detectedIn: `Mensaje ${conv.totalMessages - 1}`,
@@ -138,7 +138,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
       }
     } else if (interest.includes('consulta') || interest.includes('pregunta') || interest.includes('info')) {
       return {
-        label: '💬 Consulta',
+        label: 'Consulta',
         icon: '💬',
         category: 'Información',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 3) + 1}`,
@@ -146,7 +146,7 @@ const ConversationModal: React.FC<ConversationModalProps> = ({
       }
     } else {
       return {
-        label: `🏷️ ${conv.interest.substring(0, 30)}${conv.interest.length > 30 ? '...' : ''}`,
+        label: `${conv.interest.substring(0, 30)}${conv.interest.length > 30 ? '...' : ''}`,
         icon: '🏷️',
         category: 'Personalizado',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,

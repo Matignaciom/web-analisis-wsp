@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback } from 'react'
 import { Copy } from 'lucide-react'
 import type { Conversation } from '@/domain/entities/Conversation'
+import { ConversationStatus } from '@/domain/entities/Conversation'
 import { useExport } from '@/hooks/useExport'
 import { useDynamicDashboard } from '@/hooks/useDynamicDashboard'
 
@@ -43,11 +44,64 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     autoUpdate: false
   })
 
+  // 🔍 FUNCIÓN PARA DETECTAR VENTAS COMPLETADAS (MISMA LÓGICA QUE MÉTRICAS)
+  const isCompletedSale = useCallback((conv: Conversation): boolean => {
+    // 1. Verificar status explícitos de venta (misma lógica que DynamicMetricsService)
+    const salesStatuses = ['completed', 'completado', 'finalizado', 'vendido', 'venta', 'exitoso', 'won', 'closed-won']
+    if (salesStatuses.includes(conv.status.toLowerCase())) {
+      return true
+    }
+    
+    // 2. Detectar indicadores de venta en mensajes
+    const lastMsg = conv.lastMessage?.toLowerCase() || ''
+    const salesKeywords = ['compra', 'comprar', 'venta', 'vendido', 'pago', 'transferencia', 'factura', 'entrega', 'envío']
+    if (salesKeywords.some(keyword => lastMsg.includes(keyword))) {
+      return true
+    }
+    
+    // 3. Detectar por alto número de mensajes con alta satisfacción
+    if (conv.totalMessages > 10 && conv.metadata?.satisfaction && conv.metadata.satisfaction >= 4) {
+      return true
+    }
+    
+    return false
+  }, [])
+
+  // 🔍 FUNCIÓN PARA DETECTAR CONVERSACIONES ABANDONADAS (MISMA LÓGICA QUE MÉTRICAS)
+  const isAbandonedConversation = useCallback((conv: Conversation): boolean => {
+    // 1. Verificar status explícitos de abandono
+    const abandonedStatuses = ['abandoned', 'abandonado', 'perdido', 'cancelado', 'rechazado', 'lost', 'closed-lost']
+    if (abandonedStatuses.includes(conv.status.toLowerCase())) {
+      return true
+    }
+    
+    // 2. Detectar indicadores de abandono en mensajes
+    const lastMsg = conv.lastMessage?.toLowerCase() || ''
+    const abandonKeywords = ['no me interesa', 'muy caro', 'no gracias', 'después', 'cancelar', 'rechazar']
+    if (abandonKeywords.some(keyword => lastMsg.includes(keyword))) {
+      return true
+    }
+    
+    // 3. Detectar abandono por baja actividad
+    if (conv.totalMessages <= 2 && conv.metadata?.satisfaction && conv.metadata.satisfaction <= 2) {
+      return true
+    }
+    
+    // 4. Detectar abandono por falta de respuesta reciente
+    const daysSinceStart = conv.startDate ? 
+      Math.floor((Date.now() - conv.startDate.getTime()) / (1000 * 60 * 60 * 24)) : 0
+    if (daysSinceStart > 7 && conv.totalMessages <= 3) {
+      return true
+    }
+    
+    return false
+  }, [])
+
   // 💡 FUNCIÓN PARA ETIQUETAS ESTANDARIZADAS DE INTERÉS (DECLARADA ANTES DE USARSE)
   const getStandardizedInterest = useCallback((conv: Conversation) => {
     if (!conv.interest) {
       return {
-        label: '🤖 Sin analizar',
+        label: 'Sin analizar',
         icon: '🤖',
         category: 'Sin datos',
         detectedIn: 'N/A',
@@ -60,7 +114,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     // Mapeo inteligente de intereses a etiquetas estandarizadas
     if (interest.includes('factura') || interest.includes('invoice')) {
       return {
-        label: '🧾 Factura A',
+        label: 'Factura A',
         icon: '🧾',
         category: 'Documentación',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,
@@ -68,7 +122,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       }
     } else if (interest.includes('compra') || interest.includes('comprar') || interest.includes('precio')) {
       return {
-        label: '🛒 Intención de compra',
+        label: 'Intención de compra',
         icon: '🛒',
         category: 'Comercial',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages * 0.6) + 1}`,
@@ -76,7 +130,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       }
     } else if (interest.includes('pago') || interest.includes('transferencia') || interest.includes('money')) {
       return {
-        label: '💰 Pago',
+        label: 'Pago',
         icon: '💰',
         category: 'Transacción',
         detectedIn: `Mensaje ${conv.totalMessages - 1}`,
@@ -84,7 +138,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       }
     } else if (interest.includes('consulta') || interest.includes('pregunta') || interest.includes('info')) {
       return {
-        label: '💬 Consulta',
+        label: 'Consulta',
         icon: '💬',
         category: 'Información',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 3) + 1}`,
@@ -92,7 +146,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       }
     } else {
       return {
-        label: `🏷️ ${conv.interest.substring(0, 30)}${conv.interest.length > 30 ? '...' : ''}`,
+        label: `${conv.interest.substring(0, 30)}${conv.interest.length > 30 ? '...' : ''}`,
         icon: '🏷️',
         category: 'Personalizado',
         detectedIn: `Mensaje ${Math.floor(conv.totalMessages / 2) + 1}`,
@@ -180,87 +234,100 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     }
   }, [getStandardizedInterest])
 
-  // 🎯 FUNCIÓN PARA DETERMINAR ESTADO INTELIGENTE (DECLARADA ANTES DE USARSE)
+  // 🎯 FUNCIÓN PARA DETERMINAR ESTADO INTELIGENTE AVANZADO (SINCRONIZADA CON MÉTRICAS)
   const getConversationStatus = useCallback((conv: Conversation) => {
-    if (conv.status === 'completed') {
+    // Usar la MISMA lógica avanzada que las métricas para detectar estados reales
+    
+    // 1. Verificar si es venta completada usando lógica avanzada
+    if (isCompletedSale(conv)) {
       return {
-        status: 'Cerrado',
+        status: 'Completada',
         icon: '✅',
         color: '#22c55e',
-        description: 'Conversación completada exitosamente'
+        description: 'Venta completada exitosamente'
       }
-    } else if (conv.status === 'active') {
-      return {
-        status: 'En proceso',
-        icon: '🔄',
-        color: '#3b82f6',
-        description: 'Conversación activa en desarrollo'
-      }
-    } else if (conv.status === 'pending') {
-      return {
-        status: 'Pendiente',
-        icon: '⏳',
-        color: '#f59e0b',
-        description: 'Esperando respuesta o acción'
-      }
-    } else if (conv.status === 'abandoned') {
+    }
+    
+    // 2. Verificar si está abandonada usando lógica avanzada  
+    if (isAbandonedConversation(conv)) {
       return {
         status: 'Requiere atención',
         icon: '🚨',
         color: '#ef4444',
         description: 'Conversación abandonada - requiere seguimiento'
       }
-    } else {
-      // Análisis inteligente basado en actividad
-      if (conv.totalMessages > 5) {
-        return {
-          status: 'En proceso',
-          icon: '🔄',
-          color: '#3b82f6',
-          description: 'Conversación con actividad detectada'
-        }
-      } else {
-        return {
-          status: 'Pendiente',
-          icon: '⏳',
-          color: '#f59e0b',
-          description: 'Conversación inicial - requiere seguimiento'
-        }
+    }
+    
+    // 3. Verificar estados explícitos restantes
+    if (conv.status === ConversationStatus.ACTIVE || conv.status.toLowerCase() === 'activo') {
+      return {
+        status: 'En proceso',
+        icon: '🔄',
+        color: '#3b82f6',
+        description: 'Conversación activa en desarrollo'
       }
     }
-  }, [])
+    
+    // 4. Análisis inteligente basado en actividad para estados ambiguos
+    if (conv.totalMessages > 5) {
+      return {
+        status: 'En proceso',
+        icon: '🔄',
+        color: '#3b82f6',
+        description: 'Conversación con actividad detectada'
+      }
+    } else {
+      return {
+        status: 'Pendiente',
+        icon: '⏳',
+        color: '#f59e0b',
+        description: 'Conversación inicial - requiere seguimiento'
+      }
+    }
+  }, [isCompletedSale, isAbandonedConversation])
 
-  // 🧠 FUNCIÓN PARA SUGERENCIAS PARAMETRIZADAS (DECLARADA ANTES DE USARSE)
+  // 🎯 FUNCIÓN PARA SUGERENCIAS PARAMETRIZADAS MEJORADAS
   const getParametrizedSuggestion = useCallback((conv: Conversation) => {
+    const status = getConversationStatus(conv)
     const interest = getStandardizedInterest(conv)
     const potential = getAdvancedSalesPotential(conv)
-    const status = getConversationStatus(conv)
     
-    let suggestion = ''
-    let priority: '🚨' | '⏳' | '✅' = '⏳'
-    let action = ''
+    let suggestion: string
+    let priority: string
+    let action: string
     
-    // Lógica parametrizada basada en contexto
-    if (interest.category === 'Transacción' && potential.level === 'high') {
-      suggestion = `Enviar link de pago para el producto solicitado al cliente ${conv.customerName}`
-      priority = '🚨'
-      action = 'Urgente'
-    } else if (interest.category === 'Comercial' && status.status === 'En proceso') {
-      suggestion = `Hacer seguimiento por interés en MercadoPago con mensaje de agradecimiento para ${conv.customerName}`
+    if (potential.level === 'high') {
+      suggestion = `🎯 OPORTUNIDAD: ${conv.customerName} muestra alto potencial. Contactar inmediatamente para cerrar venta`
+      priority = '🚀'
+      action = 'Venta'
+    } else if (interest.category === 'Comercial') {
+      suggestion = `💰 COMERCIAL: ${conv.customerName} tiene interés de compra. Enviar propuesta personalizada`
+      priority = '🎯'
+      action = 'Propuesta'
+    } else if (interest.label.includes('precio') || interest.label.includes('Precio')) {
+      suggestion = `💲 PRECIO: ${conv.customerName} pregunta precios. Enviar cotización detallada y beneficios`
+      priority = '📊'
+      action = 'Cotización'
+    } else if (interest.category === 'Transacción') {
+      suggestion = `💳 PAGO: ${conv.customerName} consulta sobre pagos. Explicar métodos y facilitar proceso`
       priority = '⏳'
-      action = 'Seguimiento'
+      action = 'Facilitar'
     } else if (status.status === 'Requiere atención') {
-      suggestion = `Contactar inmediatamente a ${conv.customerName} para recuperar conversación abandonada`
+      suggestion = `🚨 URGENTE: ${conv.customerName} abandonó la conversación. Recuperar contacto inmediatamente`
       priority = '🚨'
-      action = 'Urgente'
+      action = 'Recuperar'
     } else if (interest.category === 'Información') {
-      suggestion = `Proporcionar información detallada solicitada y evaluar interés de compra de ${conv.customerName}`
-      priority = '⏳'
-      action = 'Seguimiento'
+      suggestion = `📋 INFO: ${conv.customerName} busca información. Enviar detalles completos y evaluar interés`
+      priority = '📞'
+      action = 'Informar'
+    } else if (conv.totalMessages <= 1) {
+      suggestion = `🔰 NUEVO: ${conv.customerName} inició contacto. Dar bienvenida y conocer sus necesidades`
+      priority = '👋'
+      action = 'Bienvenida'
     } else {
-      suggestion = `Enviar mensaje de seguimiento personalizado para mantener engagement con ${conv.customerName}`
+      suggestion = `📞 SEGUIMIENTO: ${conv.customerName} necesita atención personalizada. Hacer seguimiento activo`
       priority = '✅'
-      action = 'Confirmación'
+      action = 'Seguimiento'
     }
     
     return {
@@ -271,51 +338,7 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     }
   }, [getStandardizedInterest, getAdvancedSalesPotential, getConversationStatus])
 
-  // 🔧 CONFIGURACIÓN DINÁMICA DE STATUS
-  const getStatusConfig = (status: string, _count: number, _total: number, rate: number, _metrics?: any) => {
-    const statusMap: Record<string, any> = {
-      'completed': {
-        label: 'Completadas',
-        icon: '✅',
-        description: `🏆 ${rate.toFixed(1)}% conversaciones completadas exitosamente`,
-        priority: 'high'
-      },
-      'active': {
-        label: 'Activas',
-        icon: rate > 50 ? '🟢' : rate > 20 ? '🔄' : '⚠️',
-        description: rate > 50 ? `📈 Alta actividad: ${rate.toFixed(1)}% en progreso` : 
-                    rate > 20 ? `📊 Actividad moderada: ${rate.toFixed(1)}%` : 
-                    `📉 Baja actividad: ${rate.toFixed(1)}%`,
-        priority: rate > 30 ? 'high' : 'medium'
-      },
-      'pending': {
-        label: 'Pendientes',
-        icon: '⏳',
-        description: `⏳ ${rate.toFixed(1)}% esperando respuesta o acción`,
-        priority: rate > 30 ? 'medium' : 'low'
-      },
-      'abandoned': {
-        label: 'Abandonadas',
-        icon: rate > 30 ? '🚨' : '🔴',
-        description: rate > 30 ? `🚨 CRÍTICO: ${rate.toFixed(1)}% abandonadas` : 
-                    `📉 ${rate.toFixed(1)}% abandonadas - oportunidad de recuperación`,
-        priority: rate > 30 ? 'high' : 'medium'
-      },
-      'sin_definir': {
-        label: 'Sin definir',
-        icon: '❓',
-        description: `❓ ${rate.toFixed(1)}% sin status definido - requiere clasificación`,
-        priority: 'medium'
-      }
-    }
-    
-    return statusMap[status] || {
-      label: status.charAt(0).toUpperCase() + status.slice(1),
-      icon: '📝',
-      description: `📝 ${rate.toFixed(1)}% con status: ${status}`,
-      priority: 'low'
-    }
-  }
+
   
   // 🎯 CONFIGURACIÓN DINÁMICA DE POTENCIAL
   const getPotentialConfig = (potential: string, _count: number, _total: number, percentage: number) => {
@@ -356,10 +379,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     // Obtener métricas del dashboard para contexto
     const metrics = dashboard?.mainMetrics
     
-    // 1. ANÁLISIS DINÁMICO DE STATUS EXISTENTES
+    // 1. ANÁLISIS DINÁMICO DE STATUS REALES USANDO LÓGICA AVANZADA
     const statusCounts = conversations.reduce((acc, conv) => {
-      const status = conv.status || 'sin_definir'
-      acc[status] = (acc[status] || 0) + 1
+      const statusInfo = getConversationStatus(conv)
+      const statusKey = statusInfo.status.toLowerCase().replace(/\s+/g, '_')
+      acc[statusKey] = (acc[statusKey] || 0) + 1
       return acc
     }, {} as Record<string, number>)
     
@@ -390,48 +414,67 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       filterLogic: () => true
     })
     
-    // 4. GENERAR FILTROS POR STATUS EN ORDEN ESPECÍFICO
-    // Primero agregar "Pendientes" si existen
-    const pendingCount = statusCounts['pending'] || 0
-    if (pendingCount > 0) {
-      const percentage = Math.round((pendingCount / total) * 100)
-      const rate = (pendingCount / total) * 100
-      const statusConfig = getStatusConfig('pending', pendingCount, total, rate, metrics)
-      
-      filters.push({
-        id: 'status_pending',
-        label: statusConfig.label,
-        icon: statusConfig.icon,
-        count: pendingCount,
-        percentage,
-        description: statusConfig.description,
-        priority: statusConfig.priority,
-        filterLogic: (conv) => (conv.status || 'sin_definir') === 'pending'
-      })
-    }
-    
-    // Luego agregar otros status (excluyendo pending que ya se agregó)
+    // 4. GENERAR FILTROS POR TODOS LOS STATUS REALES DETECTADOS
     Object.entries(statusCounts)
-      .filter(([status]) => status !== 'pending') // Excluir pending ya que se agregó arriba
       .sort(([,a], [,b]) => b - a) // Ordenar por cantidad (mayor a menor)
-      .forEach(([status, count]) => {
+      .forEach(([statusKey, count]) => {
         if (count === 0) return
         
         const percentage = Math.round((count / total) * 100)
         const rate = (count / total) * 100
         
-        // Configuración dinámica por tipo de status
-        const statusConfig = getStatusConfig(status, count, total, rate, metrics)
+        // Obtener configuración basada en el status real
+        let statusConfig
+        if (statusKey === 'completada') {
+          statusConfig = {
+            label: `Completadas (${count})`,
+            icon: '✅',
+            description: `✅ ${count} ventas completadas exitosamente - ${rate.toFixed(1)}% del total`,
+            priority: 'high'
+          }
+        } else if (statusKey === 'requiere_atención') {
+          statusConfig = {
+            label: `Requieren Atención (${count})`,
+            icon: '🚨',
+            description: `🚨 ${count} conversaciones abandonadas que requieren seguimiento - ${rate.toFixed(1)}% del total`,
+            priority: 'high'
+          }
+        } else if (statusKey === 'en_proceso') {
+          statusConfig = {
+            label: `En Proceso (${count})`,
+            icon: '🔄',
+            description: `🔄 ${count} conversaciones activas en desarrollo - ${rate.toFixed(1)}% del total`,
+            priority: 'medium'
+          }
+        } else if (statusKey === 'pendiente') {
+          statusConfig = {
+            label: `Pendientes (${count})`,
+            icon: '⏳',
+            description: `⏳ ${count} conversaciones esperando respuesta o acción - ${rate.toFixed(1)}% del total`,
+            priority: 'medium'
+          }
+        } else {
+          statusConfig = {
+            label: `📝 ${statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replace(/_/g, ' ')} (${count})`,
+            icon: '📝',
+            description: `📝 ${count} conversaciones con estado: ${statusKey.replace(/_/g, ' ')} - ${rate.toFixed(1)}% del total`,
+            priority: 'low'
+          }
+        }
         
         filters.push({
-          id: `status_${status}`,
+          id: `status_${statusKey}`,
           label: statusConfig.label,
           icon: statusConfig.icon,
           count,
           percentage,
           description: statusConfig.description,
-          priority: statusConfig.priority,
-          filterLogic: (conv) => (conv.status || 'sin_definir') === status
+          priority: statusConfig.priority as 'high' | 'medium' | 'low',
+          filterLogic: (conv) => {
+            const convStatusInfo = getConversationStatus(conv)
+            const convStatusKey = convStatusInfo.status.toLowerCase().replace(/\s+/g, '_')
+            return convStatusKey === statusKey
+          }
         })
       })
     
@@ -460,31 +503,33 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
     
     // 6. AGREGAR FILTROS POR MÉTRICAS DE RENDIMIENTO
     if (metrics) {
-      // Filtro para ventas completadas
-      if (metrics.completedSales > 0) {
+      // Filtro para ventas completadas usando lógica AVANZADA sincronizada
+      const realCompletedSales = conversations.filter(isCompletedSale).length
+      if (realCompletedSales > 0) {
         filters.push({
           id: 'metric_completed_sales',
-          label: `Ventas Completadas (${metrics.completedSales})`,
+          label: `Ventas Completadas (${realCompletedSales})`,
           icon: '✅',
-          count: metrics.completedSales,
-          percentage: Math.round((metrics.completedSales / total) * 100),
-          description: `✅ ${metrics.completedSales} conversaciones que resultaron en venta`,
+          count: realCompletedSales,
+          percentage: Math.round((realCompletedSales / total) * 100),
+          description: `✅ ${realCompletedSales} conversaciones que resultaron en venta (detectadas por IA avanzada) - ${((realCompletedSales / total) * 100).toFixed(1)}% del total`,
           priority: 'high',
-          filterLogic: (conv) => conv.status === 'completed'
+          filterLogic: (conv) => isCompletedSale(conv)
         })
       }
       
-      // Filtro para conversaciones abandonadas
-      if (metrics.abandonedChats > 0) {
+      // Filtro para conversaciones abandonadas usando lógica AVANZADA sincronizada
+      const realAbandonedChats = conversations.filter(isAbandonedConversation).length
+      if (realAbandonedChats > 0) {
         filters.push({
           id: 'metric_abandoned',
-          label: `Abandonadas (${metrics.abandonedChats})`,
+          label: `Abandonadas (${realAbandonedChats})`,
           icon: '❌',
-          count: metrics.abandonedChats,
-          percentage: Math.round((metrics.abandonedChats / total) * 100),
-          description: `❌ ${metrics.abandonedChats} conversaciones abandonadas - oportunidades de recuperación`,
+          count: realAbandonedChats,
+          percentage: Math.round((realAbandonedChats / total) * 100),
+          description: `❌ ${realAbandonedChats} conversaciones abandonadas (detectadas por IA avanzada) - ${((realAbandonedChats / total) * 100).toFixed(1)}% oportunidades de recuperación`,
           priority: 'medium',
-          filterLogic: (conv) => conv.status === 'abandoned'
+          filterLogic: (conv) => isAbandonedConversation(conv)
         })
       }
       
@@ -497,11 +542,11 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
         if (highConversionCount > 0) {
           filters.push({
             id: 'metric_high_conversion',
-            label: `Alto Potencial Conversión`,
+            label: `Alto Potencial Conversión (${highConversionCount})`,
             icon: '🎯',
             count: highConversionCount,
             percentage: Math.round((highConversionCount / total) * 100),
-            description: `🎯 Conversaciones con alta probabilidad de conversión (${metrics.conversionRate.toFixed(1)}% tasa actual)`,
+            description: `🎯 ${highConversionCount} conversaciones con alta probabilidad de conversión (tasa actual: ${metrics.conversionRate.toFixed(1)}%)`,
             priority: 'high',
             filterLogic: (conv) => {
               const advancedPotential = getAdvancedSalesPotential(conv)
@@ -509,6 +554,81 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
             }
           })
         }
+      }
+
+      // 7. FILTROS ADICIONALES BASADOS EN MÉTRICAS DE ENGAGEMENT Y TENDENCIAS
+      
+      // Filtro para Alto Engagement (basado en número de mensajes)
+      const highEngagementCount = conversations.filter(c => c.totalMessages > 10).length
+      if (highEngagementCount > 0) {
+        filters.push({
+          id: 'metric_high_engagement',
+          label: `Alto Engagement (${highEngagementCount})`,
+          icon: '💬',
+          count: highEngagementCount,
+          percentage: Math.round((highEngagementCount / total) * 100),
+          description: `💬 ${highEngagementCount} conversaciones con alto engagement (>10 mensajes) - ${((highEngagementCount / total) * 100).toFixed(1)}% del total`,
+          priority: 'medium',
+          filterLogic: (conv) => conv.totalMessages > 10
+        })
+      }
+
+      // Filtro para Conversaciones con Tiempo de Respuesta Rápido
+      const fastResponseCount = conversations.filter(c => 
+        c.metadata?.responseTime && c.metadata.responseTime <= 30
+      ).length
+      if (fastResponseCount > 0) {
+        filters.push({
+          id: 'metric_fast_response',
+          label: `Respuesta Rápida (${fastResponseCount})`,
+          icon: '⚡',
+          count: fastResponseCount,
+          percentage: Math.round((fastResponseCount / total) * 100),
+          description: `⚡ ${fastResponseCount} conversaciones con respuesta rápida (≤30 min) - ${((fastResponseCount / total) * 100).toFixed(1)}% del total`,
+          priority: 'medium',
+          filterLogic: (conv) => !!(conv.metadata?.responseTime && conv.metadata.responseTime <= 30)
+        })
+      }
+
+      // Filtro para Conversaciones con Alta Satisfacción
+      const highSatisfactionCount = conversations.filter(c => 
+        c.metadata?.satisfaction && c.metadata.satisfaction >= 4
+      ).length
+      if (highSatisfactionCount > 0) {
+        filters.push({
+          id: 'metric_high_satisfaction',
+          label: `Alta Satisfacción (${highSatisfactionCount})`,
+          icon: '⭐',
+          count: highSatisfactionCount,
+          percentage: Math.round((highSatisfactionCount / total) * 100),
+          description: `⭐ ${highSatisfactionCount} conversaciones con alta satisfacción (≥4/5) - ${((highSatisfactionCount / total) * 100).toFixed(1)}% del total`,
+          priority: 'high',
+          filterLogic: (conv) => !!(conv.metadata?.satisfaction && conv.metadata.satisfaction >= 4)
+        })
+      }
+
+      // Filtro para Oportunidades de Recuperación (abandonadas con alto potencial)
+      const recoveryOpportunitiesCount = conversations.filter(c => {
+        const isAbandoned = c.status === ConversationStatus.ABANDONED || ['abandonado', 'perdido'].includes(c.status.toLowerCase())
+        const advancedPotential = getAdvancedSalesPotential(c)
+        return isAbandoned && (advancedPotential.level === 'medium' || advancedPotential.level === 'high')
+      }).length
+      
+      if (recoveryOpportunitiesCount > 0) {
+        filters.push({
+          id: 'metric_recovery_opportunities',
+          label: `Oportunidades Recuperables (${recoveryOpportunitiesCount})`,
+          icon: '🔄',
+          count: recoveryOpportunitiesCount,
+          percentage: Math.round((recoveryOpportunitiesCount / total) * 100),
+          description: `🔄 ${recoveryOpportunitiesCount} conversaciones abandonadas con potencial medio/alto - ${((recoveryOpportunitiesCount / total) * 100).toFixed(1)}% del total`,
+          priority: 'high',
+          filterLogic: (conv) => {
+            const isAbandoned = conv.status === ConversationStatus.ABANDONED || ['abandonado', 'perdido'].includes(conv.status.toLowerCase())
+            const advancedPotential = getAdvancedSalesPotential(conv)
+            return isAbandoned && (advancedPotential.level === 'medium' || advancedPotential.level === 'high')
+          }
+        })
       }
     }
     
@@ -553,61 +673,61 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       })
     }
 
-    // Aplicar filtros de IA con lógica mejorada
+    // Aplicar filtros de IA con lógica SINCRONIZADA con el panel de IA
     if (selectedAIFilters.length > 0) {
       console.log('🔍 Aplicando filtros de IA:', selectedAIFilters)
       filtered = filtered.filter(conv => {
         return selectedAIFilters.some(filterId => {
+          // Usar la MISMA lógica de clasificación que en AIInsightsPanel
           const suggestion = conv.aiSuggestion?.toLowerCase() || ''
           const interest = conv.interest?.toLowerCase() || ''
           const lastMessage = conv.lastMessage?.toLowerCase() || ''
           
-          switch (filterId) {
-            case 'proactive':
-              return suggestion.includes('iniciar') ||
-                     suggestion.includes('proactiv') ||
-                     suggestion.includes('contactar') ||
-                     suggestion.includes('llamar') ||
-                     suggestion.includes('escribir') ||
-                     conv.status === 'pending'
-            case 'followUp':
-              return suggestion.includes('seguimiento') ||
-                     suggestion.includes('follow') ||
-                     suggestion.includes('continuar') ||
-                     suggestion.includes('retomar') ||
-                     suggestion.includes('volver a contactar') ||
-                     conv.status === 'active'
-            case 'pricing':
-              return interest.includes('precio') ||
-                     interest.includes('costo') ||
-                     interest.includes('cuanto') ||
-                     interest.includes('tarifa') ||
-                     lastMessage.includes('precio') ||
-                     lastMessage.includes('costo')
-            case 'support':
-              return interest.includes('soporte') ||
-                     interest.includes('ayuda') ||
-                     interest.includes('problema') ||
-                     interest.includes('duda') ||
-                     suggestion.includes('soporte') ||
-                     suggestion.includes('ayuda')
-            case 'negotiation':
-              return suggestion.includes('negocia') ||
-                     suggestion.includes('oferta') ||
-                     suggestion.includes('descuento') ||
-                     suggestion.includes('propuesta') ||
-                     suggestion.includes('cerrar') ||
-                     conv.salesPotential === 'high'
-            case 'general':
-              return interest.includes('general') ||
-                     interest.includes('información') ||
-                     interest.includes('consulta') ||
-                     (!conv.interest || conv.interest === 'Sin definir') ||
-                     interest === ''
-            default:
-              console.warn('Filtro de IA no reconocido:', filterId)
-              return false
+          // Clasificar la conversación usando la MISMA lógica de prioridad
+          let convCategory = 'general' // Por defecto
+          
+          // 1. Prioridad alta: Oportunidades de venta (alta conversión)
+          if (conv.salesPotential === 'high' || 
+              suggestion.includes('negocia') || 
+              suggestion.includes('oferta') || 
+              suggestion.includes('descuento')) {
+            convCategory = 'negotiation'
           }
+          // 2. Consultas de precio (específicas)
+          else if (interest.includes('precio') || 
+                   interest.includes('costo') || 
+                   lastMessage.includes('precio') || 
+                   lastMessage.includes('cuanto')) {
+            convCategory = 'pricing'
+          }
+          // 3. Seguimiento activo
+          else if (conv.status === 'active' || 
+                   suggestion.includes('seguimiento') || 
+                   suggestion.includes('follow') || 
+                   suggestion.includes('continuar')) {
+            convCategory = 'followUp'
+          }
+          // 4. Soporte y problemas
+          else if (interest.includes('soporte') || 
+                   interest.includes('ayuda') || 
+                   interest.includes('problema') || 
+                   suggestion.includes('soporte')) {
+            convCategory = 'support'
+          }
+          // 5. Conversación proactiva (pendientes)
+          else if (conv.status === 'pending' || 
+                   suggestion.includes('iniciar') || 
+                   suggestion.includes('proactiv') || 
+                   suggestion.includes('contactar')) {
+            convCategory = 'proactive'
+          }
+          // 6. General (resto)
+          else {
+            convCategory = 'general'
+          }
+          
+          // Retornar si la conversación pertenece a la categoría del filtro
+          return convCategory === filterId
         })
       })
       console.log('🎯 Conversaciones filtradas por IA:', filtered.length)
@@ -725,22 +845,47 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
 
 
 
-  // 📝 MEJORA: FUNCIÓN PARA RESUMEN UNIFORME
+  // 📝 MEJORA: FUNCIÓN PARA RESUMEN UNIFORME Y CLARO
   const getUniformSummary = (conv: Conversation) => {
-    if (!conv.aiSummary) {
-      return `Cliente ${conv.id.slice(-4)} en proceso de análisis. Mensajes: ${conv.totalMessages}. Estado: Pendiente de evaluación IA.`
-    }
-    
     const interest = getStandardizedInterest(conv)
     const status = getConversationStatus(conv)
     
-    // Estructura uniforme: "Cliente {número} expresó {interés}. Estado: {estado}. Mensajes: {cantidad}. Último: "...""
-    const clientNumber = conv.id.slice(-4)
-    const lastMessagePreview = conv.lastMessage.length > 30 
-      ? conv.lastMessage.substring(0, 30) + '...'
-      : conv.lastMessage
+    // Obtener una muestra más útil del último mensaje
+    let lastMessageSample = conv.lastMessage
+    if (lastMessageSample.includes('- Cliente:') || lastMessageSample.includes('- Asesor:')) {
+      // Si es formato WhatsApp, extraer solo el contenido del cliente
+      const clientMessages = lastMessageSample.split('\n')
+        .filter(line => line.includes('- Cliente:'))
+        .map(line => line.replace(/^.*- Cliente:\s*/, '').trim())
+        .filter(msg => msg.length > 0)
+      
+      if (clientMessages.length > 0) {
+        lastMessageSample = clientMessages[clientMessages.length - 1] // Último mensaje del cliente
+      }
+    }
     
-    return `Cliente ${clientNumber} expresó ${interest.label.replace(/[🤖🧾🛒💰💬🏷️]/g, '').trim()}. Estado: ${status.status}. Mensajes: ${conv.totalMessages}. Último: "${lastMessagePreview}"`
+    // Limpiar y truncar mensaje
+    const cleanMessage = lastMessageSample
+      .replace(/\[.*?\]/g, '') // Remover [etiquetas]
+      .replace(/^-\s*/, '') // Remover guiones iniciales
+      .trim()
+    
+    const messagePreview = cleanMessage.length > 50 
+      ? cleanMessage.substring(0, 50) + '...'
+      : cleanMessage
+    
+    // Crear resumen más humano y comprensible
+    const interestText = interest.label.replace(/[🤖🧾🛒💰💬🏷️]/g, '').trim()
+    
+    if (conv.totalMessages <= 1) {
+      return `${conv.customerName} inició contacto. ${interestText}. Dice: "${messagePreview}"`
+    } else if (status.status === 'Requiere atención') {
+      return `${conv.customerName} abandonó conversación. Último interés: ${interestText}. Dijo: "${messagePreview}"`
+    } else if (interest.category === 'Comercial') {
+      return `${conv.customerName} muestra interés comercial. ${interestText}. Último mensaje: "${messagePreview}"`
+    } else {
+      return `${conv.customerName} - ${status.status}. ${interestText}. Conversación: ${conv.totalMessages} mensajes. Dice: "${messagePreview}"`
+    }
   }
 
 
@@ -758,6 +903,8 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
       return '👁️ Ver mensajes de cliente'
     }
   }
+
+
 
   return (
     <div className={styles.analysisContainer}>
@@ -1107,10 +1254,10 @@ const DetailedAnalysisTable: React.FC<DetailedAnalysisTableProps> = ({
                           <span style={{ 
                             fontSize: '10px', 
                             fontWeight: '600',
-                            color: parametrizedSuggestion.priority === '🚨' ? '#ef4444' : 
-                                  parametrizedSuggestion.priority === '⏳' ? '#f59e0b' : '#22c55e',
-                            backgroundColor: parametrizedSuggestion.priority === '🚨' ? '#fef2f2' : 
-                                            parametrizedSuggestion.priority === '⏳' ? '#fffbeb' : '#f0fdf4',
+                            color: parametrizedSuggestion.priority === '🚀' ? '#22c55e' : 
+                                  parametrizedSuggestion.priority === '🎯' ? '#f59e0b' : '#ef4444',
+                            backgroundColor: parametrizedSuggestion.priority === '🚀' ? '#f0fdf4' : 
+                                            parametrizedSuggestion.priority === '🎯' ? '#fffbeb' : '#fef2f2',
                             padding: '2px 6px',
                             borderRadius: '3px'
                           }}>

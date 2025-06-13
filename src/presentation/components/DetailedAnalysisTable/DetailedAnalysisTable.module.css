@@ -266,6 +266,73 @@
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
 }
 
+/* Estilos para filtros de métricas de rendimiento */
+.statusFilterButton[class*="metric_completed_sales"] {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border-color: #059669;
+}
+
+.statusFilterButton[class*="metric_completed_sales"]:hover {
+  background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.statusFilterButton[class*="metric_abandoned"] {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  border-color: #dc2626;
+}
+
+.statusFilterButton[class*="metric_abandoned"]:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+.statusFilterButton[class*="metric_high_engagement"] {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  color: white;
+  border-color: #7c3aed;
+}
+
+.statusFilterButton[class*="metric_high_engagement"]:hover {
+  background: linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
+}
+
+.statusFilterButton[class*="metric_fast_response"] {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  border-color: #f59e0b;
+}
+
+.statusFilterButton[class*="metric_fast_response"]:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.statusFilterButton[class*="metric_high_satisfaction"] {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border-color: #8b5cf6;
+}
+
+.statusFilterButton[class*="metric_high_satisfaction"]:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.statusFilterButton[class*="metric_recovery_opportunities"] {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  color: white;
+  border-color: #06b6d4;
+}
+
+.statusFilterButton[class*="metric_recovery_opportunities"]:hover {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+}
+
 /* Estilos de prioridad para los filtros */
 .statusFilterButton.priority-high {
   border: 2px solid #ef4444;
@@ -365,7 +432,7 @@
 }
 
 .table th:nth-child(1) { width: 180px; } /* 🧑‍💼 Cliente */
-.table th:nth-child(2) { width: 120px; } /* 📍 Estado */
+.table th:nth-child(2) { width: 140px; } /* 📍 Estado */
 .table th:nth-child(3) { width: 200px; min-width: 180px; } /* 💡 Interés Detectado */
 .table th:nth-child(4) { width: 140px; } /* 📈 Potencial Venta */
 .table th:nth-child(5) { width: 200px; } /* 🔍 Justificación */
@@ -750,7 +817,8 @@
 /* Estado */
 .statusCell {
   text-align: center;
-  min-width: 100px;
+  min-width: 140px;
+  white-space: nowrap;
 }
 
 .statusBadge {
@@ -884,7 +952,7 @@
   }
   
   .table th:nth-child(1) { width: 140px; } /* Cliente más pequeño */
-  .table th:nth-child(2) { width: 100px; } /* Estado más pequeño */
+  .table th:nth-child(2) { width: 120px; } /* Estado más pequeño */
   .table th:nth-child(3) { width: 140px; } /* Interés más pequeño */
   .table th:nth-child(4) { width: 120px; } /* Potencial más pequeño */
   .table th:nth-child(5) { width: 100px; } /* Justificación más pequeña */
